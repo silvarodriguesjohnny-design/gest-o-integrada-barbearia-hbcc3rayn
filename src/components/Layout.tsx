@@ -1,13 +1,133 @@
-/* Layout Component - A component that wraps the main content of the app
-   - Use this file to add a header, footer, or other elements that should be present on every page
-   - This component is used in the App.tsx file to wrap the main content of the app */
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarTrigger,
+} from '@/components/ui/sidebar'
+import {
+  Bell,
+  Calendar,
+  DollarSign,
+  Gift,
+  Home,
+  Search,
+  Scissors,
+  Users,
+  LogOut,
+} from 'lucide-react'
+import { Link, Outlet, useLocation } from 'react-router-dom'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { cn } from '@/lib/utils'
 
-import { Outlet } from 'react-router-dom'
+const NAV_ITEMS = [
+  { name: 'Dashboard', path: '/', icon: Home },
+  { name: 'Agenda', path: '/agenda', icon: Calendar },
+  { name: 'Clientes', path: '/clientes', icon: Users },
+  { name: 'Financeiro', path: '/financeiro', icon: DollarSign },
+  { name: 'Campanhas', path: '/campanhas', icon: Gift },
+]
 
 export default function Layout() {
+  const location = useLocation()
+
   return (
-    <main className="flex flex-col min-h-screen">
-      <Outlet />
-    </main>
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full bg-background">
+        <Sidebar>
+          <SidebarHeader className="flex h-16 items-center border-b px-4">
+            <div className="flex items-center gap-2 font-serif text-2xl font-bold text-primary">
+              <Scissors className="h-6 w-6 text-accent" />
+              BarberFlow
+            </div>
+          </SidebarHeader>
+          <SidebarContent>
+            <SidebarGroup>
+              <SidebarGroupContent>
+                <SidebarMenu className="mt-4 gap-2">
+                  {NAV_ITEMS.map((item) => {
+                    const isActive = location.pathname === item.path
+                    return (
+                      <SidebarMenuItem key={item.path}>
+                        <SidebarMenuButton
+                          asChild
+                          isActive={isActive}
+                          className={cn('text-base transition-colors', isActive && 'text-accent')}
+                        >
+                          <Link to={item.path}>
+                            <item.icon className="h-5 w-5" />
+                            <span>{item.name}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      </SidebarMenuItem>
+                    )
+                  })}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </SidebarContent>
+        </Sidebar>
+
+        <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+          <header className="flex h-16 items-center justify-between border-b bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="flex items-center gap-4 flex-1">
+              <SidebarTrigger className="md:hidden" />
+              <div className="relative w-full max-w-md hidden md:block">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Buscar clientes ou agendamentos..."
+                  className="w-full bg-muted/50 pl-9"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" size="icon" className="relative">
+                <Bell className="h-5 w-5" />
+                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive border border-background"></span>
+              </Button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-9 w-9 rounded-full ml-2">
+                    <Avatar className="h-9 w-9 border-2 border-transparent hover:border-accent transition-colors">
+                      <AvatarImage
+                        src="https://img.usecurling.com/ppl/thumbnail?gender=male&seed=1"
+                        alt="Admin"
+                      />
+                      <AvatarFallback>AD</AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem>Configurações</DropdownMenuItem>
+                  <DropdownMenuItem className="text-destructive focus:text-destructive">
+                    <LogOut className="mr-2 h-4 w-4" /> Sair
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </header>
+
+          <div className="flex-1 overflow-y-auto p-4 md:p-8 animate-fade-in">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+    </SidebarProvider>
   )
 }
