@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Navigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/use-auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,12 +9,14 @@ import { Scissors, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 
 export default function Login() {
-  const { signIn } = useAuth()
+  const { signIn, user, loading: authLoading } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+
+  if (!authLoading && user) return <Navigate to="/dashboard" replace />
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -24,7 +26,7 @@ export default function Login() {
     if (error) {
       toast({ title: 'Erro ao entrar', description: error.message, variant: 'destructive' })
     } else {
-      navigate('/')
+      navigate('/dashboard')
     }
   }
 

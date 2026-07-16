@@ -5,6 +5,20 @@ export interface Profile {
   email: string
   avatar_url: string | null
   created_at: string
+  tenant_id: string | null
+  is_super_admin: boolean
+}
+
+export type PlanType = 'essential' | 'pro' | 'elite'
+
+export interface Tenant {
+  id: string
+  name: string
+  logo_url: string | null
+  plan_type: PlanType
+  subscription_status: string | null
+  owner_id: string
+  created_at: string
 }
 
 export interface Customer {

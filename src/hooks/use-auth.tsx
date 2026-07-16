@@ -1,7 +1,7 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase/client'
-import type { Profile } from '@/types'
+import type { Profile, Tenant } from '@/types'
 
 const db = supabase as any
 
@@ -9,9 +9,12 @@ interface AuthContextType {
   user: User | null
   session: Session | null
   profile: Profile | null
+  tenant: Tenant | null
+  isSuperAdmin: boolean
   signUp: (email: string, password: string) => Promise<{ error: any }>
   signIn: (email: string, password: string) => Promise<{ error: any }>
   signOut: () => Promise<{ error: any }>
+  refreshAuth: () => Promise<void>
   loading: boolean
 }
 
@@ -27,7 +30,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [tenant, setTenant] = useState<Tenant | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const fetchProfile = useCallback(async (uid: string) => {
+    const { data } = await db.from('profiles').select('*, tenant:tenants(*)').eq('id', uid).single()
+    if (data) {
+      const { tenant: t, ...profileData } = data
+      setProfile(profileData as Profile)
+      setTenant(t as Tenant | null)
+    }
+  }, [])
 
   useEffect(() => {
     const {
@@ -47,23 +60,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (user) {
-      db.from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single()
-        .then(({ data }: any) => {
-          setProfile(data as Profile | null)
-        })
+      fetchProfile(user.id)
     } else {
       setProfile(null)
+      setTenant(null)
     }
-  }, [user])
+  }, [user, fetchProfile])
+
+  const refreshAuth = useCallback(async () => {
+    if (user) await fetchProfile(user.id)
+  }, [user, fetchProfile])
 
   const signUp = async (email: string, password: string) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/` },
+      options: { emailRedirectTo: `${window.location.origin}/dashboard` },
     })
     return { error }
   }
@@ -76,8 +88,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error }
   }
 
+  const isSuperAdmin = profile?.is_super_admin ?? false
+
   return (
-    <AuthContext.Provider value={{ user, session, profile, signUp, signIn, signOut, loading }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        session,
+        profile,
+        tenant,
+        isSuperAdmin,
+        signUp,
+        signIn,
+        signOut,
+        refreshAuth,
+        loading,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

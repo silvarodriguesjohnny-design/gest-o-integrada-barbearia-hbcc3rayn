@@ -20,6 +20,8 @@ import {
   Scissors,
   Users,
   LogOut,
+  Settings,
+  Crown,
 } from 'lucide-react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Input } from '@/components/ui/input'
@@ -36,17 +38,18 @@ import { useAuth } from '@/hooks/use-auth'
 import { Loader2 } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { name: 'Dashboard', path: '/', icon: Home },
+  { name: 'Dashboard', path: '/dashboard', icon: Home },
   { name: 'Agenda', path: '/agenda', icon: Calendar },
   { name: 'Clientes', path: '/clientes', icon: Users },
   { name: 'Financeiro', path: '/financeiro', icon: DollarSign },
   { name: 'Campanhas', path: '/campanhas', icon: Gift },
+  { name: 'Configurações', path: '/settings', icon: Settings },
 ]
 
 export default function Layout() {
   const location = useLocation()
   const navigate = useNavigate()
-  const { profile, signOut } = useAuth()
+  const { profile, tenant, isSuperAdmin, signOut } = useAuth()
 
   const handleSignOut = async () => {
     await signOut()
@@ -59,14 +62,28 @@ export default function Layout() {
         <Sidebar>
           <SidebarHeader className="flex h-16 items-center border-b px-4">
             <div className="flex items-center gap-2 font-serif text-2xl font-bold text-primary">
-              <Scissors className="h-6 w-6 text-accent" /> BarberFlow
+              {tenant?.logo_url ? (
+                <img
+                  src={tenant.logo_url}
+                  alt={tenant.name}
+                  className="h-8 w-8 rounded-lg object-cover"
+                />
+              ) : (
+                <Scissors className="h-6 w-6 text-accent" />
+              )}
+              <span className="truncate">{tenant?.name || 'BarberFlow'}</span>
             </div>
           </SidebarHeader>
           <SidebarContent>
             <SidebarGroup>
               <SidebarGroupContent>
                 <SidebarMenu className="mt-4 gap-2">
-                  {NAV_ITEMS.map((item) => {
+                  {[
+                    ...NAV_ITEMS,
+                    ...(isSuperAdmin
+                      ? [{ name: 'Super Admin', path: '/super-admin', icon: Crown }]
+                      : []),
+                  ].map((item) => {
                     const isActive = location.pathname === item.path
                     return (
                       <SidebarMenuItem key={item.path}>
