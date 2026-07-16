@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Calendar as CalendarComponent } from '@/components/ui/calendar'
@@ -7,8 +7,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
   DialogFooter,
+  DialogTrigger,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,21 +19,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Clock, Plus, Share2, User } from 'lucide-react'
-import { MOCK_APPOINTMENTS } from '@/lib/mock'
+import { Clock, Plus, Share2, User, Loader2 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { Badge } from '@/components/ui/badge'
+import { getAppointmentsByDate, createAppointment } from '@/services/appointments'
+import { getCustomers } from '@/services/customers'
+import { getServices } from '@/services/catalog'
+import type { AppointmentWithRelations, CustomerWithDetails, Service } from '@/types'
 
 export default function Agenda() {
   const [date, setDate] = useState<Date | undefined>(new Date())
+  const [appointments, setAppointments] = useState<AppointmentWithRelations[]>([])
+  const [loading, setLoading] = useState(true)
   const { toast } = useToast()
+
+  const load = (d: Date) => {
+    setLoading(true)
+    getAppointmentsByDate(d).then(({ data, error }) => {
+      if (error) toast({ title: 'Erro', description: error.message, variant: 'destructive' })
+      else setAppointments(data || [])
+      setLoading(false)
+    })
+  }
+
+  useEffect(() => {
+    if (date) load(date)
+  }, [date])
 
   const copyLink = () => {
     navigator.clipboard.writeText('https://barberflow.app/book/minhabarbearia')
-    toast({
-      title: 'Link copiado!',
-      description: 'Envie para seus clientes agendarem online.',
-    })
+    toast({ title: 'Link copiado!', description: 'Envie para seus clientes agendarem online.' })
   }
 
   return (
@@ -51,7 +66,7 @@ export default function Agenda() {
           >
             <Share2 className="h-4 w-4 mr-2" /> Link Público
           </Button>
-          <NewBookingModal />
+          <NewBookingModal onCreated={() => date && load(date)} />
         </div>
       </div>
 
@@ -73,52 +88,66 @@ export default function Agenda() {
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y">
-              {MOCK_APPOINTMENTS.map((app) => (
-                <div
-                  key={app.id}
-                  className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 hover:bg-muted/30 transition-colors"
-                >
-                  <div className="flex flex-col items-center justify-center w-20 px-2 py-1.5 rounded-md bg-accent/10 text-accent shrink-0">
-                    <Clock className="h-4 w-4 mb-1" />
-                    <span className="font-bold">{app.time}</span>
-                  </div>
-
-                  <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4 items-center w-full">
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase font-bold mb-1">
-                        Cliente
-                      </p>
-                      <p className="font-semibold flex items-center gap-1">
-                        <User className="h-3.5 w-3.5" /> {app.customer}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase font-bold mb-1">
-                        Serviço
-                      </p>
-                      <p className="font-medium">{app.service}</p>
-                    </div>
-                    <div className="hidden md:block">
-                      <p className="text-xs text-muted-foreground uppercase font-bold mb-1">
-                        Profissional
-                      </p>
-                      <p className="font-medium">{app.barber}</p>
-                    </div>
-                    <div className="text-right sm:text-center md:text-right w-full">
-                      <Badge
-                        variant={app.status === 'Concluído' ? 'secondary' : 'default'}
-                        className={
-                          app.status === 'Concluído'
-                            ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                            : ''
-                        }
-                      >
-                        {app.status}
-                      </Badge>
-                    </div>
-                  </div>
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-accent" />
                 </div>
-              ))}
+              ) : appointments.length === 0 ? (
+                <p className="text-center text-muted-foreground py-12">
+                  Nenhum agendamento para esta data.
+                </p>
+              ) : (
+                appointments.map((app) => (
+                  <div
+                    key={app.id}
+                    className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 hover:bg-muted/30 transition-colors"
+                  >
+                    <div className="flex flex-col items-center justify-center w-20 px-2 py-1.5 rounded-md bg-accent/10 text-accent shrink-0">
+                      <Clock className="h-4 w-4 mb-1" />
+                      <span className="font-bold">
+                        {new Date(app.start_time).toLocaleTimeString('pt-BR', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    </div>
+                    <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4 items-center w-full">
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase font-bold mb-1">
+                          Cliente
+                        </p>
+                        <p className="font-semibold flex items-center gap-1">
+                          <User className="h-3.5 w-3.5" /> {app.customer?.name || 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground uppercase font-bold mb-1">
+                          Serviço
+                        </p>
+                        <p className="font-medium">{app.service?.name || 'N/A'}</p>
+                      </div>
+                      <div className="hidden md:block">
+                        <p className="text-xs text-muted-foreground uppercase font-bold mb-1">
+                          Profissional
+                        </p>
+                        <p className="font-medium">{app.barber_name || '-'}</p>
+                      </div>
+                      <div className="text-right">
+                        <Badge
+                          variant={app.status === 'completed' ? 'secondary' : 'default'}
+                          className={
+                            app.status === 'completed'
+                              ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                              : ''
+                          }
+                        >
+                          {app.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
@@ -127,14 +156,45 @@ export default function Agenda() {
   )
 }
 
-function NewBookingModal() {
+function NewBookingModal({ onCreated }: { onCreated: () => void }) {
   const { toast } = useToast()
+  const [customers, setCustomers] = useState<CustomerWithDetails[]>([])
+  const [services, setServices] = useState<Service[]>([])
+  const [customerId, setCustomerId] = useState('')
+  const [serviceId, setServiceId] = useState('')
+  const [barber, setBarber] = useState('')
+  const [date, setDate] = useState('')
+  const [time, setTime] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const handleSave = () => {
-    toast({
-      title: 'Agendamento criado',
-      description: 'O cliente receberá uma notificação via WhatsApp.',
+  useEffect(() => {
+    Promise.all([getCustomers(), getServices()]).then(([c, s]) => {
+      if (c.data) setCustomers(c.data)
+      if (s.data) setServices(s.data)
     })
+  }, [])
+
+  const handleSave = async () => {
+    const service = services.find((s) => s.id === serviceId)
+    if (!service || !customerId || !date || !time) {
+      toast({ title: 'Preencha todos os campos', variant: 'destructive' })
+      return
+    }
+    setLoading(true)
+    const startTime = new Date(`${date}T${time}`)
+    const { error } = await createAppointment({
+      customer_id: customerId,
+      service_id: serviceId,
+      barber_name: barber,
+      start_time: startTime.toISOString(),
+      duration_minutes: service.duration_minutes,
+    })
+    setLoading(false)
+    if (error) toast({ title: 'Erro', description: error.message, variant: 'destructive' })
+    else {
+      toast({ title: 'Agendamento criado', description: 'O cliente receberá uma notificação.' })
+      onCreated()
+    }
   }
 
   return (
@@ -151,31 +211,44 @@ function NewBookingModal() {
         <div className="grid gap-5 py-4">
           <div className="space-y-2">
             <Label className="text-sm font-semibold">Cliente</Label>
-            <Input placeholder="Nome do cliente" />
+            <Select value={customerId} onValueChange={setCustomerId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione" />
+              </SelectTrigger>
+              <SelectContent>
+                {customers.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-sm font-semibold">Serviço</Label>
-              <Select>
+              <Select value={serviceId} onValueChange={setServiceId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="corte">Corte (R$ 45)</SelectItem>
-                  <SelectItem value="barba">Barba (R$ 35)</SelectItem>
-                  <SelectItem value="combo">Corte + Barba (R$ 75)</SelectItem>
+                  {services.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.name} (R$ {s.price})
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-semibold">Profissional</Label>
-              <Select>
+              <Select value={barber} onValueChange={setBarber}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="thiago">Thiago</SelectItem>
-                  <SelectItem value="felipe">Felipe</SelectItem>
+                  <SelectItem value="Thiago">Thiago</SelectItem>
+                  <SelectItem value="Felipe">Felipe</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -183,23 +256,18 @@ function NewBookingModal() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-sm font-semibold">Data</Label>
-              <Input type="date" />
+              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-semibold">Horário</Label>
-              <Input type="time" />
+              <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
             </div>
           </div>
         </div>
         <DialogFooter>
-          <DialogTrigger asChild>
-            <Button variant="outline">Cancelar</Button>
-          </DialogTrigger>
-          <DialogTrigger asChild>
-            <Button onClick={handleSave} className="bg-primary text-white">
-              Salvar Agendamento
-            </Button>
-          </DialogTrigger>
+          <Button onClick={handleSave} disabled={loading} className="bg-primary text-white">
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Salvar Agendamento
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

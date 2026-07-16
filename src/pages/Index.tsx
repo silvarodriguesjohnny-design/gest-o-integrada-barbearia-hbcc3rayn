@@ -1,25 +1,50 @@
+import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { LineChart, Line, ResponsiveContainer, PieChart, Pie, Cell, XAxis } from 'recharts'
-import { ArrowUpRight, TrendingUp, Users, AlertCircle, Clock, DollarSign } from 'lucide-react'
-
-const REVENUE_DATA = [
-  { day: '01', income: 400 },
-  { day: '05', income: 800 },
-  { day: '10', income: 1200 },
-  { day: '15', income: 2400 },
-  { day: '20', income: 1800 },
-  { day: '25', income: 3200 },
-  { day: '30', income: 4100 },
-]
-
-const PIE_DATA = [
-  { name: 'Corte', value: 45, fill: 'hsl(var(--chart-1))' },
-  { name: 'Barba', value: 25, fill: 'hsl(var(--chart-2))' },
-  { name: 'Combo', value: 30, fill: 'hsl(var(--chart-3))' },
-]
+import {
+  ArrowUpRight,
+  TrendingUp,
+  Users,
+  AlertCircle,
+  Clock,
+  DollarSign,
+  Loader2,
+} from 'lucide-react'
+import { getDashboardMetrics } from '@/services/dashboard'
+import { useToast } from '@/hooks/use-toast'
+import type { DashboardMetrics } from '@/types'
 
 export default function Index() {
+  const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
+  const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
+
+  useEffect(() => {
+    getDashboardMetrics().then(({ data, error }) => {
+      if (error) {
+        toast({
+          title: 'Erro ao carregar dados',
+          description: error.message,
+          variant: 'destructive',
+        })
+      } else {
+        setMetrics(data)
+      }
+      setLoading(false)
+    })
+  }, [toast])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+      </div>
+    )
+  }
+
+  const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
   return (
     <div className="space-y-6">
       <div>
@@ -36,9 +61,9 @@ export default function Index() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 15.430,00</div>
+            <div className="text-2xl font-bold">{fmt(metrics?.totalRevenue || 0)}</div>
             <p className="text-xs text-emerald-500 flex items-center mt-1 font-medium">
-              <ArrowUpRight className="mr-1 h-3 w-3" /> +12.5% vs. mês anterior
+              <ArrowUpRight className="mr-1 h-3 w-3" /> Receita líquida do período
             </p>
           </CardContent>
         </Card>
@@ -49,8 +74,8 @@ export default function Index() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">R$ 65,00</div>
-            <p className="text-xs text-muted-foreground mt-1">Baseado em 237 atendimentos</p>
+            <div className="text-2xl font-bold">{fmt(metrics?.ticketMedio || 0)}</div>
+            <p className="text-xs text-muted-foreground mt-1">Baseado em atendimentos concluídos</p>
           </CardContent>
         </Card>
 
@@ -60,21 +85,24 @@ export default function Index() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">45</div>
-            <p className="text-xs text-muted-foreground mt-1">Top 10% de gastos</p>
+            <div className="text-2xl font-bold">{metrics?.vipCount ?? 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">10+ selos no cartão fidelidade</p>
           </CardContent>
         </Card>
 
         <Card className="border-destructive/50 bg-destructive/5 hover:shadow-elevation transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-destructive flex items-center gap-2">
-              <AlertCircle className="h-4 w-4" />
-              Perda por Inatividade
+              <AlertCircle className="h-4 w-4" /> Perda por Inatividade
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">R$ 780,00</div>
-            <p className="text-xs text-destructive/80 mt-1">12 clientes ausentes {'>'} 60 dias</p>
+            <div className="text-2xl font-bold text-destructive">
+              {fmt(metrics?.inactivityLoss || 0)}
+            </div>
+            <p className="text-xs text-destructive/80 mt-1">
+              {metrics?.inactiveCount ?? 0} clientes ausentes {'>'} 60 dias
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -90,7 +118,10 @@ export default function Index() {
               className="h-[300px] w-full"
             >
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={REVENUE_DATA} margin={{ top: 5, right: 10, left: 10, bottom: 0 }}>
+                <LineChart
+                  data={metrics?.revenueData || []}
+                  margin={{ top: 5, right: 10, left: 10, bottom: 0 }}
+                >
                   <XAxis dataKey="day" axisLine={false} tickLine={false} tickMargin={10} />
                   <ChartTooltip content={<ChartTooltipContent />} />
                   <Line
@@ -112,18 +143,11 @@ export default function Index() {
             <CardTitle>Distribuição de Serviços</CardTitle>
           </CardHeader>
           <CardContent className="flex justify-center items-center h-[300px]">
-            <ChartContainer
-              config={{
-                corte: { label: 'Corte', color: 'hsl(var(--chart-1))' },
-                barba: { label: 'Barba', color: 'hsl(var(--chart-2))' },
-                combo: { label: 'Combo', color: 'hsl(var(--chart-3))' },
-              }}
-              className="h-[250px] w-full"
-            >
+            <ChartContainer config={{}} className="h-[250px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={PIE_DATA}
+                    data={metrics?.serviceData || []}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
@@ -131,7 +155,7 @@ export default function Index() {
                     paddingAngle={5}
                     dataKey="value"
                   >
-                    {PIE_DATA.map((entry, index) => (
+                    {(metrics?.serviceData || []).map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.fill} />
                     ))}
                   </Pie>
@@ -149,20 +173,33 @@ export default function Index() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center gap-4 rounded-lg border p-4 bg-muted/20">
+            {(metrics?.recentAppointments || []).map((appt) => (
+              <div
+                key={appt.id}
+                className="flex items-center gap-4 rounded-lg border p-4 bg-muted/20"
+              >
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/10">
                   <Clock className="h-5 w-5 text-accent" />
                 </div>
                 <div className="flex-1 space-y-1">
-                  <p className="text-sm font-semibold leading-none">Corte + Barba concluído</p>
+                  <p className="text-sm font-semibold leading-none">
+                    {appt.service?.name || 'Serviço'} - {appt.status}
+                  </p>
                   <p className="text-sm text-muted-foreground">
-                    Cliente: João Silva • Profissional: Thiago
+                    Cliente: {appt.customer?.name || 'N/A'} • Profissional:{' '}
+                    {appt.barber_name || 'N/A'}
                   </p>
                 </div>
-                <div className="font-bold text-emerald-600">+ R$ 85,00</div>
+                <div className="font-bold text-emerald-600">
+                  {appt.service ? fmt(Number(appt.service.price)) : ''}
+                </div>
               </div>
             ))}
+            {(!metrics?.recentAppointments || metrics.recentAppointments.length === 0) && (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                Nenhuma atividade recente.
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
