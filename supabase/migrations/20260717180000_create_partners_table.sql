@@ -18,7 +18,8 @@ DROP POLICY IF EXISTS "partners_insert" ON public.partners;
 CREATE POLICY "partners_insert" ON public.partners FOR INSERT TO authenticated
   WITH CHECK (public.is_super_admin() OR tenant_id = public.get_user_tenant_id());
 
-DROP POLICY IF EXISTS "partners_update" ON public.partners FOR UPDATE TO authenticated
+DROP POLICY IF EXISTS "partners_update" ON public.partners;
+CREATE POLICY "partners_update" ON public.partners FOR UPDATE TO authenticated
   USING (public.is_super_admin() OR tenant_id = public.get_user_tenant_id())
   WITH CHECK (public.is_super_admin() OR tenant_id = public.get_user_tenant_id());
 
