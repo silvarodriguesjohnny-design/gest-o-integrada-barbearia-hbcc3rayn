@@ -5,7 +5,7 @@ const BENEFITS = [
   {
     icon: CalendarClock,
     title: 'Agendamento Automatizado',
-    description: 'Reduza faltas com lembretes automáticos e allow clients to book online 24/7.',
+    description: 'Reduza faltas com lembretes automáticos e permita agendamentos online 24/7.',
   },
   {
     icon: Users,
@@ -15,7 +15,7 @@ const BENEFITS = [
   {
     icon: Wallet,
     title: 'Controle Financeiro',
-    description: 'PDV integrado, fluxo de caixa em tempo real e relatórios que Você entende.',
+    description: 'PDV integrado, fluxo de caixa em tempo real e relatórios que você entende.',
   },
   {
     icon: Gift,

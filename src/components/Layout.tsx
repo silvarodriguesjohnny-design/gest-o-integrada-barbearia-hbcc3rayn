@@ -145,7 +145,9 @@ export default function Layout() {
                       {profile?.role || 'viewer'}
                     </p>
                   </div>
-                  <DropdownMenuItem>Configurações</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/settings')}>
+                    Configurações
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
                     onClick={handleSignOut}
