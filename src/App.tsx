@@ -14,12 +14,13 @@ import Campanhas from './pages/Campanhas'
 import Settings from './pages/Settings'
 import SuperAdmin from './pages/SuperAdmin'
 import Onboarding from './pages/Onboarding'
+import TrialExpired from './pages/TrialExpired'
 import NotFound from './pages/NotFound'
 import Login from './pages/Login'
 import Layout from './components/Layout'
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { user, loading } = useAuth()
+  const { user, loading, trialExpired, isSuperAdmin } = useAuth()
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -28,6 +29,7 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
     )
   }
   if (!user) return <Navigate to="/login" replace />
+  if (trialExpired && !isSuperAdmin) return <Navigate to="/trial-expired" replace />
   return <>{children}</>
 }
 
@@ -55,6 +57,7 @@ const App = () => (
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/trial-expired" element={<TrialExpired />} />
           <Route
             element={
               <ProtectedRoute>

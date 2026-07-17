@@ -19,8 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Clock, Plus, Share2, User, Loader2 } from 'lucide-react'
+import { Clock, Plus, Share2, User, Loader2, MessageCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/hooks/use-auth'
 import { Badge } from '@/components/ui/badge'
 import { getAppointmentsByDate, createAppointment } from '@/services/appointments'
 import { getCustomers } from '@/services/customers'
@@ -32,6 +33,7 @@ export default function Agenda() {
   const [appointments, setAppointments] = useState<AppointmentWithRelations[]>([])
   const [loading, setLoading] = useState(true)
   const { toast } = useToast()
+  const { tenant } = useAuth()
 
   const load = (d: Date) => {
     setLoading(true)
@@ -66,6 +68,20 @@ export default function Agenda() {
           >
             <Share2 className="h-4 w-4 mr-2" /> Link Público
           </Button>
+          {tenant?.whatsapp_phone && (
+            <a
+              href={`https://wa.me/${tenant.whatsapp_phone.replace(/\D/g, '')}?text=${encodeURIComponent('Olá! Gostaria de agendar um horário.')}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <Button
+                variant="outline"
+                className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 transition-transform active:scale-95"
+              >
+                <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp
+              </Button>
+            </a>
+          )}
           <NewBookingModal onCreated={() => date && load(date)} />
         </div>
       </div>

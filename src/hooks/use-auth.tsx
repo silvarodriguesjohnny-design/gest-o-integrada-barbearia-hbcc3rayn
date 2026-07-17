@@ -1,4 +1,12 @@
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+  useMemo,
+  ReactNode,
+} from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase/client'
 import type { Profile, Tenant } from '@/types'
@@ -15,6 +23,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: any }>
   signOut: () => Promise<{ error: any }>
   refreshAuth: () => Promise<void>
+  trialExpired: boolean
   loading: boolean
 }
 
@@ -90,6 +99,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const isSuperAdmin = profile?.is_super_admin ?? false
 
+  const trialExpired = useMemo(() => {
+    if (!tenant) return false
+    if (tenant.subscription_type === 'past_due') return true
+    if (tenant.subscription_type === 'trial' && tenant.trial_ends_at) {
+      return new Date(tenant.trial_ends_at) < new Date()
+    }
+    return false
+  }, [tenant])
+
   return (
     <AuthContext.Provider
       value={{
@@ -102,6 +120,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         signIn,
         signOut,
         refreshAuth,
+        trialExpired,
         loading,
       }}
     >

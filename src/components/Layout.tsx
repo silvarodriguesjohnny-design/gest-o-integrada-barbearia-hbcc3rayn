@@ -71,7 +71,7 @@ export default function Layout() {
               ) : (
                 <Scissors className="h-6 w-6 text-accent" />
               )}
-              <span className="truncate">{tenant?.name || 'BarberFlow'}</span>
+              <span className="truncate">{tenant?.name || 'na régua'}</span>
             </div>
           </SidebarHeader>
           <SidebarContent>
@@ -81,7 +81,7 @@ export default function Layout() {
                   {[
                     ...NAV_ITEMS,
                     ...(isSuperAdmin
-                      ? [{ name: 'Super Admin', path: '/super-admin', icon: Crown }]
+                      ? [{ name: 'Admin Financeiro', path: '/admin/finance', icon: Crown }]
                       : []),
                   ].map((item) => {
                     const isActive = location.pathname === item.path

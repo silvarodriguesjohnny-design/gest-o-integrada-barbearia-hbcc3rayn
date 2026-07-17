@@ -37,7 +37,7 @@ export default function Login() {
           <div className="flex justify-center">
             <div className="flex items-center gap-2 font-serif text-3xl font-bold text-primary">
               <Scissors className="h-8 w-8 text-accent" />
-              BarberFlow
+              na régua
             </div>
           </div>
           <CardTitle className="text-2xl">Bem-vindo de volta</CardTitle>

@@ -2,18 +2,19 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { db } from '@/services/db'
+import { notifyNewTenant } from '@/services/billing'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Scissors, Loader2, Check, ArrowLeft } from 'lucide-react'
+import { Loader2, Check, ArrowLeft, Sparkles } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 
 const PLANS = [
-  { id: 'essential', name: 'Essential', price: 'R$ 97,90/mês' },
-  { id: 'pro', name: 'Pro', price: 'R$ 117,90/mês' },
-  { id: 'elite', name: 'Elite', price: 'R$ 297,90/mês' },
+  { id: 'essential', name: 'Essential', price: 'R$ 97,90/mês', barbers: '2 barbeiros' },
+  { id: 'pro', name: 'Pro', price: 'R$ 117,90/mês', barbers: '3 barbeiros', popular: true },
+  { id: 'elite', name: 'Elite', price: 'R$ 297,90/mês', barbers: 'Ilimitado' },
 ]
 
 export default function Onboarding() {
@@ -53,9 +54,18 @@ export default function Onboarding() {
       return
     }
 
+    const trialEndsAt = new Date()
+    trialEndsAt.setDate(trialEndsAt.getDate() + 30)
+
     const { data: tenantData, error: tenantError } = await db
       .from('tenants')
-      .insert({ name: shopName, owner_id: userId, plan_type: plan })
+      .insert({
+        name: shopName,
+        owner_id: userId,
+        plan_type: plan,
+        subscription_type: 'trial',
+        trial_ends_at: trialEndsAt.toISOString(),
+      })
       .select()
       .single()
 
@@ -71,7 +81,16 @@ export default function Onboarding() {
 
     await db.from('profiles').update({ tenant_id: tenantData.id, role: 'admin' }).eq('id', userId)
 
-    toast({ title: 'Conta criada!', description: 'Bem-vindo ao BarberFlow!' })
+    try {
+      await notifyNewTenant(shopName, plan)
+    } catch {
+      // Notification is non-critical
+    }
+
+    toast({
+      title: 'Conta criada!',
+      description: 'Bem-vindo ao na régua! Seu teste grátis de 30 dias começou.',
+    })
     navigate('/dashboard')
     setLoading(false)
   }
@@ -87,10 +106,13 @@ export default function Onboarding() {
             <ArrowLeft className="h-4 w-4" /> Voltar
           </Link>
           <div className="flex items-center gap-2 font-serif text-2xl font-bold text-primary">
-            <Scissors className="h-6 w-6 text-accent" /> BarberFlow
+            <span className="text-accent">na régua</span>
           </div>
           <CardTitle>Criar sua conta</CardTitle>
-          <CardDescription>Comece a gerenciar sua barbearia em minutos.</CardDescription>
+          <CardDescription className="flex items-center gap-1.5">
+            <Sparkles className="h-4 w-4 text-accent" />
+            Comece com 30 dias grátis. Sem cartão de crédito.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -159,7 +181,7 @@ export default function Onboarding() {
             </div>
             <Button type="submit" className="w-full h-12 text-base" disabled={loading}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Criar Conta e Começar
+              Criar Conta e Começar Teste Grátis
             </Button>
           </form>
         </CardContent>

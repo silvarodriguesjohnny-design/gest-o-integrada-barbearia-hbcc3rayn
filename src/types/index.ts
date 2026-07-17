@@ -10,6 +10,7 @@ export interface Profile {
 }
 
 export type PlanType = 'essential' | 'pro' | 'elite'
+export type SubscriptionType = 'trial' | 'active' | 'past_due'
 
 export interface Tenant {
   id: string
@@ -17,6 +18,9 @@ export interface Tenant {
   logo_url: string | null
   plan_type: PlanType
   subscription_status: string | null
+  subscription_type: SubscriptionType
+  trial_ends_at: string | null
+  whatsapp_phone: string | null
   owner_id: string
   created_at: string
 }

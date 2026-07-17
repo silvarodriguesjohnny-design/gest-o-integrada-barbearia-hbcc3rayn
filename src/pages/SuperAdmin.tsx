@@ -9,15 +9,21 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Building2, Crown, TrendingUp, Users, Loader2 } from 'lucide-react'
+import { Building2, Crown, TrendingUp, Users, Loader2, Clock } from 'lucide-react'
 import { getAllTenants, calculateMRR } from '@/services/super-admin'
 import { useToast } from '@/hooks/use-toast'
+import { cn } from '@/lib/utils'
 
 const PLAN_LABELS: Record<string, string> = { essential: 'Essential', pro: 'Pro', elite: 'Elite' }
 const PLAN_COLORS: Record<string, string> = {
   essential: 'bg-blue-100 text-blue-700',
   pro: 'bg-accent text-white',
   elite: 'bg-purple-100 text-purple-700',
+}
+const STATUS_COLORS: Record<string, string> = {
+  trial: 'bg-amber-100 text-amber-700',
+  active: 'bg-emerald-100 text-emerald-700',
+  past_due: 'bg-red-100 text-red-700',
 }
 
 export default function SuperAdmin() {
@@ -34,7 +40,8 @@ export default function SuperAdmin() {
   }, [toast])
 
   const totalMRR = calculateMRR(tenants)
-  const activeCount = tenants.filter((t) => t.subscription_status === 'active').length
+  const activeCount = tenants.filter((t) => t.subscription_type === 'active').length
+  const trialCount = tenants.filter((t) => t.subscription_type === 'trial').length
   const totalBarbers = tenants.reduce((s, t) => s + (t.barber_count || 0), 0)
   const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -50,7 +57,7 @@ export default function SuperAdmin() {
     <div className="space-y-6 animate-fade-in-up">
       <div>
         <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <Crown className="h-8 w-8 text-accent" /> Super Admin - Painel Financeiro
+          <Crown className="h-8 w-8 text-accent" /> Painel Financeiro
         </h1>
         <p className="text-muted-foreground mt-1">
           Visão geral de todas as barbearias na plataforma.
@@ -60,7 +67,7 @@ export default function SuperAdmin() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="hover:shadow-elevation transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total MRR</CardTitle>
+            <CardTitle className="text-sm font-medium">MRR Total</CardTitle>
             <TrendingUp className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
@@ -71,12 +78,23 @@ export default function SuperAdmin() {
 
         <Card className="hover:shadow-elevation transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tenants Ativos</CardTitle>
+            <CardTitle className="text-sm font-medium">Tenants Pagos</CardTitle>
             <Building2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{activeCount}</div>
             <p className="text-xs text-muted-foreground mt-1">{tenants.length} total registrados</p>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-elevation transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Em Teste</CardTitle>
+            <Clock className="h-4 w-4 text-amber-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-amber-600">{trialCount}</div>
+            <p className="text-xs text-muted-foreground mt-1">Período de trial ativo</p>
           </CardContent>
         </Card>
 
@@ -88,19 +106,6 @@ export default function SuperAdmin() {
           <CardContent>
             <div className="text-2xl font-bold">{totalBarbers}</div>
             <p className="text-xs text-muted-foreground mt-1">Em todas as barbearias</p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-elevation transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ticket Médio</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {tenants.length > 0 ? fmt(totalMRR / tenants.length) : fmt(0)}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">MRR por tenant</p>
           </CardContent>
         </Card>
       </div>
@@ -116,9 +121,9 @@ export default function SuperAdmin() {
                 <TableHead className="pl-6">Barbearia</TableHead>
                 <TableHead>Plano</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Expiração</TableHead>
                 <TableHead>Barbeiros</TableHead>
                 <TableHead className="text-right pr-6">MRR</TableHead>
-                <TableHead>Criado em</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -144,7 +149,10 @@ export default function SuperAdmin() {
                             <Building2 className="h-4 w-4 text-accent" />
                           </div>
                         )}
-                        {t.name}
+                        <div>
+                          <div>{t.name}</div>
+                          <div className="text-xs text-muted-foreground">{t.owner_email}</div>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -153,23 +161,21 @@ export default function SuperAdmin() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <span
-                        className={cn(
-                          'text-sm font-medium',
-                          t.subscription_status === 'active'
-                            ? 'text-emerald-600'
-                            : 'text-muted-foreground',
-                        )}
+                      <Badge
+                        className={STATUS_COLORS[t.subscription_type] || ''}
+                        variant="secondary"
                       >
-                        {t.subscription_status || 'active'}
-                      </span>
+                        {t.subscription_type || 'trial'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {t.trial_ends_at
+                        ? new Date(t.trial_ends_at).toLocaleDateString('pt-BR')
+                        : '-'}
                     </TableCell>
                     <TableCell>{t.barber_count || 0}</TableCell>
                     <TableCell className="text-right pr-6 font-bold text-emerald-600">
                       {fmt(t.mrr || 0)}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {new Date(t.created_at).toLocaleDateString('pt-BR')}
                     </TableCell>
                   </TableRow>
                 ))
@@ -181,5 +187,3 @@ export default function SuperAdmin() {
     </div>
   )
 }
-
-import { cn } from '@/lib/utils'

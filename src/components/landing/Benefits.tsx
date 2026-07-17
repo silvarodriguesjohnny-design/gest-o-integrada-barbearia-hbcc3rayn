@@ -26,13 +26,13 @@ const BENEFITS = [
 
 export function Benefits() {
   return (
-    <section id="benefits" className="py-20 md:py-28">
+    <section id="benefits" className="py-20 md:py-28 bg-[#0a0a0a]">
       <div className="mx-auto max-w-6xl px-4">
         <div className="text-center mb-14">
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-white">
             Tudo que sua barbearia precisa
           </h2>
-          <p className="mt-3 text-muted-foreground text-lg">
+          <p className="mt-3 text-slate-400 text-lg">
             Pare de usar planilhas e papel. Professionalize sua gestão hoje.
           </p>
         </div>
@@ -40,16 +40,16 @@ export function Benefits() {
           {BENEFITS.map((b) => (
             <Card
               key={b.title}
-              className="hover:shadow-elevation transition-all hover:-translate-y-1 duration-300"
+              className="bg-slate-900 border-slate-800 hover:border-amber-500/30 transition-all hover:-translate-y-1 duration-300"
             >
               <CardHeader>
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10 mb-2">
-                  <b.icon className="h-6 w-6 text-accent" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 mb-2">
+                  <b.icon className="h-6 w-6 text-amber-500" />
                 </div>
-                <CardTitle className="text-lg">{b.title}</CardTitle>
+                <CardTitle className="text-lg text-white">{b.title}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">{b.description}</p>
+                <p className="text-sm text-slate-400">{b.description}</p>
               </CardContent>
             </Card>
           ))}

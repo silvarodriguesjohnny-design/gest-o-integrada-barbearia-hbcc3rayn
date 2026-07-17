@@ -13,7 +13,7 @@ export async function createTenant(data: {
 
 export async function updateTenant(
   id: string,
-  data: { name?: string; logo_url?: string },
+  data: { name?: string; logo_url?: string; whatsapp_phone?: string },
 ): Promise<{ error: any }> {
   const { error } = await db.from('tenants').update(data).eq('id', id)
   return { error }
