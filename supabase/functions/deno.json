@@ -1,6 +1,6 @@
 {
   "_versions": {
-    "send-notifications": 2,
-    "tenant-billing": 1
+    "send-notifications": 3,
+    "tenant-billing": 2
   }
 }
