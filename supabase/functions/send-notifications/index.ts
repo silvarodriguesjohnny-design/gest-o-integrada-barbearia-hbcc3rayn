@@ -12,6 +12,43 @@ Deno.serve(async (req: Request) => {
   }
 
   const supabase = createClient(supabaseUrl, serviceRoleKey)
+
+  let body: Record<string, unknown> = {}
+  try {
+    body = await req.json()
+  } catch {
+    // No body or invalid JSON — proceed with default notification processing
+  }
+
+  if (body.action === 'new_tenant') {
+    const { data: superAdmin } = await supabase
+      .from('profiles')
+      .select('email, full_name')
+      .eq('is_super_admin', true)
+      .single()
+
+    const recipientEmail = superAdmin?.email || 'rodriguesjohnny@hotmail.com'
+    const tenantName = (body.tenant_name as string) || 'Unknown'
+    const planType = (body.plan_type as string) || 'Unknown'
+
+    const notification = {
+      type: 'new_tenant_alert',
+      recipient: recipientEmail,
+      tenant_name: tenantName,
+      plan_type: planType,
+      message: `Novo tenant provisionado: ${tenantName} (Plano: ${planType}).`,
+      timestamp: new Date().toISOString(),
+    }
+
+    if (whatsappApiKey) {
+      // TODO: Send WhatsApp alert to super admin
+    }
+
+    return new Response(JSON.stringify({ success: true, notification }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    })
+  }
+
   const today = new Date()
   const todayMonthDay = `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   const sixtyDaysAgo = new Date(today)
@@ -59,7 +96,6 @@ Deno.serve(async (req: Request) => {
 
     if (whatsappApiKey && notifications.length > 0) {
       // TODO: Integrate with WhatsApp API using whatsappApiKey
-      // await sendWhatsAppMessages(notifications, whatsappApiKey);
     }
 
     return new Response(

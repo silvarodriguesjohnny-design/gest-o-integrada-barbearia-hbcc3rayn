@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { db } from '@/services/db'
 import { notifyNewTenant } from '@/services/billing'
+import { triggerNotifications } from '@/services/notifications'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -85,6 +86,16 @@ export default function Onboarding() {
       await notifyNewTenant(shopName, plan)
     } catch {
       // Notification is non-critical
+    }
+
+    try {
+      await triggerNotifications({
+        action: 'new_tenant',
+        tenant_name: shopName,
+        plan_type: plan,
+      })
+    } catch {
+      // Non-critical
     }
 
     toast({

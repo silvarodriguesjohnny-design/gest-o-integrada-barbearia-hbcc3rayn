@@ -22,6 +22,7 @@ import {
   LogOut,
   Settings,
   Crown,
+  MessageCircle,
 } from 'lucide-react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Input } from '@/components/ui/input'
@@ -81,7 +82,7 @@ export default function Layout() {
                   {[
                     ...NAV_ITEMS,
                     ...(isSuperAdmin
-                      ? [{ name: 'Admin Financeiro', path: '/admin/finance', icon: Crown }]
+                      ? [{ name: 'Admin Financeiro', path: '/super-admin', icon: Crown }]
                       : []),
                   ].map((item) => {
                     const isActive = location.pathname === item.path
@@ -120,6 +121,19 @@ export default function Layout() {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              {tenant?.whatsapp_phone && (
+                <a
+                  href={`https://wa.me/${tenant.whatsapp_phone.replace(/\D/g, '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="hidden md:inline-flex"
+                >
+                  <Button variant="outline" size="sm">
+                    <MessageCircle className="h-4 w-4 mr-2 text-emerald-600" />
+                    Agendar via WhatsApp
+                  </Button>
+                </a>
+              )}
               <Button variant="ghost" size="icon" className="relative">
                 <Bell className="h-5 w-5" />
                 <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive border border-background"></span>
