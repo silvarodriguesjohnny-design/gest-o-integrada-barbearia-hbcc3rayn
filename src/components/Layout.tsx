@@ -37,6 +37,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { Loader2 } from 'lucide-react'
+import { NotificationBell } from '@/components/NotificationBell'
 
 const NAV_ITEMS = [
   { name: 'Dashboard', path: '/dashboard', icon: Home },
@@ -134,10 +135,7 @@ export default function Layout() {
                   </Button>
                 </a>
               )}
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-5 w-5" />
-                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-destructive border border-background"></span>
-              </Button>
+              <NotificationBell />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-9 w-9 rounded-full ml-2">

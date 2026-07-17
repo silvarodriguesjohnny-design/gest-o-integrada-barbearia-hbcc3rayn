@@ -111,7 +111,7 @@ export default function Financeiro() {
   return (
     <div className="space-y-6 animate-fade-in-up">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Financeiro & PDV</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Financeiro & Controle de Caixa</h1>
         <p className="text-muted-foreground mt-1">Feche atendimentos e controle seu caixa.</p>
       </div>
 
@@ -121,7 +121,7 @@ export default function Financeiro() {
             value="pdv"
             className="data-[state=active]:bg-accent data-[state=active]:text-white"
           >
-            PDV (Frente de Caixa)
+            Controle de Caixa
           </TabsTrigger>
           <TabsTrigger value="fluxo">Fluxo de Caixa</TabsTrigger>
         </TabsList>

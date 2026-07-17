@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { CalendarDays, MessageSquare, Handshake, PlayCircle, Loader2, Bell } from 'lucide-react'
+import { CalendarDays, MessageSquare, Handshake, Loader2, Bell } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
-import { getCampaigns, updateCampaign } from '@/services/campaigns'
+import { getCampaigns } from '@/services/campaigns'
 import { triggerNotifications } from '@/services/notifications'
+import { CampaignCard } from '@/components/campaigns/CampaignCard'
+import { NewCampaignDialog } from '@/components/campaigns/NewCampaignDialog'
+import { PartnerDialog } from '@/components/campaigns/PartnerDialog'
 import type { Campaign } from '@/types'
 
 export default function Campanhas() {
@@ -31,21 +30,6 @@ export default function Campanhas() {
     load()
   }, [])
 
-  const handleToggle = async (id: string, active: boolean) => {
-    const { error } = await updateCampaign(id, { is_active: active })
-    if (error) toast({ title: 'Erro', description: error.message, variant: 'destructive' })
-    else load()
-  }
-
-  const handleActivate = async (c: Campaign) => {
-    const { error } = await updateCampaign(c.id, { auto_trigger: !c.auto_trigger, is_active: true })
-    if (error) toast({ title: 'Erro', description: error.message, variant: 'destructive' })
-    else {
-      toast({ title: 'Campanha atualizada!', description: 'Configurações salvas com sucesso.' })
-      load()
-    }
-  }
-
   const handleNotify = async () => {
     setNotifying(true)
     const { data, error } = await triggerNotifications()
@@ -65,19 +49,22 @@ export default function Campanhas() {
           <h1 className="text-3xl font-bold tracking-tight">Fidelidade & Campanhas</h1>
           <p className="text-muted-foreground mt-1">Automatize mensagens e gerencie parceiros.</p>
         </div>
-        <Button
-          variant="outline"
-          onClick={handleNotify}
-          disabled={notifying}
-          className="transition-transform active:scale-95"
-        >
-          {notifying ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Bell className="h-4 w-4 mr-2" />
-          )}
-          Disparar Notificações
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={handleNotify}
+            disabled={notifying}
+            className="transition-transform active:scale-95"
+          >
+            {notifying ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Bell className="h-4 w-4 mr-2" />
+            )}
+            Disparar Notificações
+          </Button>
+          <NewCampaignDialog onCreated={load} />
+        </div>
       </div>
 
       {loading ? (
@@ -95,48 +82,13 @@ export default function Campanhas() {
                 <CardDescription>Configure gatilhos para datas comemorativas.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6 pt-6">
-                {campaigns.map((c) => (
-                  <div
-                    key={c.id}
-                    className={`border rounded-lg p-5 space-y-4 bg-card shadow-sm hover:border-accent/50 transition-colors ${!c.is_active ? 'opacity-70 hover:opacity-100' : ''}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <Label className="text-lg font-bold font-serif">{c.title}</Label>
-                        <p className="text-sm text-muted-foreground">
-                          {c.auto_trigger ? 'Disparo automático ativo' : 'Disparo manual'}
-                        </p>
-                      </div>
-                      <Switch
-                        checked={c.is_active}
-                        onCheckedChange={(v) => handleToggle(c.id, v)}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label className="font-semibold">Desconto (%)</Label>
-                        <Input
-                          type="number"
-                          defaultValue={c.discount_percentage}
-                          className="w-full"
-                        />
-                      </div>
-                    </div>
-                    {c.message_template && (
-                      <div className="space-y-2">
-                        <Label className="font-semibold">Mensagem (WhatsApp)</Label>
-                        <Textarea defaultValue={c.message_template} className="h-24 resize-none" />
-                      </div>
-                    )}
-                    <Button
-                      className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-white transition-transform active:scale-95"
-                      onClick={() => handleActivate(c)}
-                    >
-                      <PlayCircle className="h-4 w-4 mr-2" />{' '}
-                      {c.auto_trigger ? 'Desativar Auto' : 'Salvar e Ativar'}
-                    </Button>
-                  </div>
-                ))}
+                {campaigns.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    Nenhuma campanha cadastrada. Clique em "Nova Campanha" para começar.
+                  </p>
+                ) : (
+                  campaigns.map((c) => <CampaignCard key={c.id} campaign={c} onUpdated={load} />)
+                )}
               </CardContent>
             </Card>
           </div>
@@ -188,12 +140,7 @@ export default function Campanhas() {
                     </div>
                     <Badge variant="secondary">Pausado</Badge>
                   </div>
-                  <Button
-                    variant="outline"
-                    className="w-full text-primary mt-4 border-dashed border-2 hover:bg-accent/5 hover:text-accent hover:border-accent transition-colors"
-                  >
-                    + Adicionar Parceiro
-                  </Button>
+                  <PartnerDialog onCreated={load} />
                 </div>
               </CardContent>
             </Card>

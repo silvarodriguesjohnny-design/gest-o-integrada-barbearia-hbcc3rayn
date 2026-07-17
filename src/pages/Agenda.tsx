@@ -32,6 +32,7 @@ export default function Agenda() {
   const [date, setDate] = useState<Date | undefined>(new Date())
   const [appointments, setAppointments] = useState<AppointmentWithRelations[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedBarber, setSelectedBarber] = useState('all')
   const { toast } = useToast()
   const { tenant } = useAuth()
 
@@ -49,9 +50,14 @@ export default function Agenda() {
   }, [date])
 
   const copyLink = () => {
-    navigator.clipboard.writeText('https://barberflow.app/book/minhabarbearia')
+    navigator.clipboard.writeText(`${window.location.origin}/book/${tenant?.id || ''}`)
     toast({ title: 'Link copiado!', description: 'Envie para seus clientes agendarem online.' })
   }
+
+  const filteredAppointments =
+    selectedBarber === 'all'
+      ? appointments
+      : appointments.filter((a) => a.barber_name === selectedBarber)
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -100,7 +106,19 @@ export default function Agenda() {
 
         <Card className="lg:col-span-3 hover:shadow-elevation transition-shadow">
           <CardHeader className="border-b bg-muted/20">
-            <CardTitle>Horários - {date?.toLocaleDateString('pt-BR')}</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle>Horários - {date?.toLocaleDateString('pt-BR')}</CardTitle>
+              <Select value={selectedBarber} onValueChange={setSelectedBarber}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Barbeiro" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="Thiago">Thiago</SelectItem>
+                  <SelectItem value="Felipe">Felipe</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y">
@@ -108,12 +126,12 @@ export default function Agenda() {
                 <div className="flex justify-center py-12">
                   <Loader2 className="h-6 w-6 animate-spin text-accent" />
                 </div>
-              ) : appointments.length === 0 ? (
+              ) : filteredAppointments.length === 0 ? (
                 <p className="text-center text-muted-foreground py-12">
                   Nenhum agendamento para esta data.
                 </p>
               ) : (
-                appointments.map((app) => (
+                filteredAppointments.map((app) => (
                   <div
                     key={app.id}
                     className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 hover:bg-muted/30 transition-colors"

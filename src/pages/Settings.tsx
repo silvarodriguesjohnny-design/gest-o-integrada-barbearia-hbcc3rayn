@@ -3,7 +3,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Upload, Save, Loader2, Store, ImageIcon, MessageCircle } from 'lucide-react'
+import {
+  Upload,
+  Save,
+  Loader2,
+  Store,
+  ImageIcon,
+  MessageCircle,
+  Copy,
+  Check,
+  Link2,
+} from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
 import { updateTenant, uploadLogo } from '@/services/tenants'
@@ -17,6 +27,7 @@ export default function Settings() {
   const [saving, setSaving] = useState(false)
   const [savingWhatsapp, setSavingWhatsapp] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const handleSave = async () => {
     if (!tenant) return
@@ -198,9 +209,47 @@ export default function Settings() {
             disabled={savingWhatsapp}
             className="bg-emerald-600 hover:bg-emerald-700"
           >
-            {savingWhatsapp && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+            {savingWhatsapp && <Loader2 className="h-4 w-4 mr-2" />}
             Salvar WhatsApp
           </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="hover:shadow-elevation transition-shadow">
+        <CardHeader className="bg-muted/20 border-b pb-4">
+          <CardTitle className="flex items-center gap-2 font-serif text-xl">
+            <Link2 className="h-5 w-5 text-accent" /> Link de Agendamento
+          </CardTitle>
+          <CardDescription>
+            Compartilhe este link para seus clientes agendarem online.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-6">
+          <div className="flex items-center gap-2">
+            <Input
+              readOnly
+              value={`${window.location.origin}/book/${tenant.id}`}
+              className="bg-muted/50 font-mono text-sm"
+            />
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => {
+                navigator.clipboard.writeText(`${window.location.origin}/book/${tenant.id}`)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
+              }}
+            >
+              {copied ? (
+                <Check className="h-4 w-4 text-emerald-600" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Os clientes podem acessar este link para agendar horários diretamente.
+          </p>
         </CardContent>
       </Card>
     </div>

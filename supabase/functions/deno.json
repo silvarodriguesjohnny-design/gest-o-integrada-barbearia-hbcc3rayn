@@ -1,6 +1,7 @@
 {
   "_versions": {
     "send-notifications": 3,
-    "tenant-billing": 2
+    "tenant-billing": 2,
+    "ai-whatsapp": 1
   }
 }
