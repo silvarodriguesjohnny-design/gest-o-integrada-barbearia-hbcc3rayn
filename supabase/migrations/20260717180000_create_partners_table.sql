@@ -14,14 +14,14 @@ DROP POLICY IF EXISTS "partners_select" ON public.partners;
 CREATE POLICY "partners_select" ON public.partners FOR SELECT TO authenticated
   USING (public.is_super_admin() OR tenant_id = public.get_user_tenant_id());
 
-DROP POLICY IF EXISTS "partners_insert" ON public.partners FOR INSERT TO authenticated
+DROP POLICY IF EXISTS "partners_insert" ON public.partners;
   WITH CHECK (public.is_super_admin() OR tenant_id = public.get_user_tenant_id());
 
 DROP POLICY IF EXISTS "partners_update" ON public.partners FOR UPDATE TO authenticated
   USING (public.is_super_admin() OR tenant_id = public.get_user_tenant_id())
   WITH CHECK (public.is_super_admin() OR tenant_id = public.get_user_tenant_id());
 
-DROP POLICY IF EXISTS "partners_delete" ON public.partners FOR DELETE TO authenticated
+DROP POLICY IF EXISTS "partners_delete" ON public.partners;
   USING (public.is_super_admin() OR tenant_id = public.get_user_tenant_id());
 
 DROP TRIGGER IF EXISTS set_tenant_on_partners ON public.partners;
