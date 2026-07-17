@@ -23,7 +23,7 @@ import { Clock, Plus, Share2, User, Loader2, MessageCircle } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
 import { Badge } from '@/components/ui/badge'
-import { getAppointmentsByDate, createAppointment } from '@/services/appointments'
+import { getAppointmentsByDate, createAppointment, getUniqueBarbers } from '@/services/appointments'
 import { getCustomers } from '@/services/customers'
 import { getServices } from '@/services/catalog'
 import type { AppointmentWithRelations, CustomerWithDetails, Service } from '@/types'
@@ -31,6 +31,7 @@ import type { AppointmentWithRelations, CustomerWithDetails, Service } from '@/t
 export default function Agenda() {
   const [date, setDate] = useState<Date | undefined>(new Date())
   const [appointments, setAppointments] = useState<AppointmentWithRelations[]>([])
+  const [barbers, setBarbers] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedBarber, setSelectedBarber] = useState('all')
   const { toast } = useToast()
@@ -46,11 +47,19 @@ export default function Agenda() {
   }
 
   useEffect(() => {
+    getUniqueBarbers().then(({ data }) => {
+      if (data) setBarbers(data)
+    })
+  }, [])
+
+  useEffect(() => {
     if (date) load(date)
   }, [date])
 
+  const bookingLink = `${window.location.origin}/booking/${tenant?.id || ''}`
+
   const copyLink = () => {
-    navigator.clipboard.writeText(`${window.location.origin}/book/${tenant?.id || ''}`)
+    navigator.clipboard.writeText(bookingLink)
     toast({ title: 'Link copiado!', description: 'Envie para seus clientes agendarem online.' })
   }
 
@@ -66,7 +75,7 @@ export default function Agenda() {
           <h1 className="text-3xl font-bold tracking-tight">Agenda</h1>
           <p className="text-muted-foreground mt-1">Gerencie seus horários e agendamentos.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button
             variant="outline"
             onClick={copyLink}
@@ -88,7 +97,7 @@ export default function Agenda() {
               </Button>
             </a>
           )}
-          <NewBookingModal onCreated={() => date && load(date)} />
+          <NewBookingModal onCreated={() => date && load(date)} barbers={barbers} />
         </div>
       </div>
 
@@ -114,8 +123,11 @@ export default function Agenda() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="Thiago">Thiago</SelectItem>
-                  <SelectItem value="Felipe">Felipe</SelectItem>
+                  {barbers.map((b) => (
+                    <SelectItem key={b} value={b}>
+                      {b}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -190,7 +202,7 @@ export default function Agenda() {
   )
 }
 
-function NewBookingModal({ onCreated }: { onCreated: () => void }) {
+function NewBookingModal({ onCreated, barbers }: { onCreated: () => void; barbers: string[] }) {
   const { toast } = useToast()
   const [customers, setCustomers] = useState<CustomerWithDetails[]>([])
   const [services, setServices] = useState<Service[]>([])
@@ -281,8 +293,11 @@ function NewBookingModal({ onCreated }: { onCreated: () => void }) {
                   <SelectValue placeholder="Selecione" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Thiago">Thiago</SelectItem>
-                  <SelectItem value="Felipe">Felipe</SelectItem>
+                  {barbers.map((b) => (
+                    <SelectItem key={b} value={b}>
+                      {b}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

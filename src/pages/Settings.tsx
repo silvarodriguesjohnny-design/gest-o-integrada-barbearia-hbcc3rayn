@@ -228,14 +228,14 @@ export default function Settings() {
           <div className="flex items-center gap-2">
             <Input
               readOnly
-              value={`${window.location.origin}/book/${tenant.id}`}
+              value={`${window.location.origin}/booking/${tenant.id}`}
               className="bg-muted/50 font-mono text-sm"
             />
             <Button
               variant="outline"
               size="icon"
               onClick={() => {
-                navigator.clipboard.writeText(`${window.location.origin}/book/${tenant.id}`)
+                navigator.clipboard.writeText(`${window.location.origin}/booking/${tenant.id}`)
                 setCopied(true)
                 setTimeout(() => setCopied(false), 2000)
               }}

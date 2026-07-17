@@ -15,7 +15,8 @@ const BENEFITS = [
   {
     icon: Wallet,
     title: 'Controle Financeiro',
-    description: 'PDV integrado, fluxo de caixa em tempo real e relatórios que você entende.',
+    description:
+      'Controle de Caixa integrado, fluxo de caixa em tempo real e relatórios que você entende.',
   },
   {
     icon: Gift,

@@ -2,26 +2,34 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { CalendarDays, MessageSquare, Handshake, Loader2, Bell } from 'lucide-react'
+import { CalendarDays, MessageSquare, Handshake, Loader2, Bell, Trash2, Pencil } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { getCampaigns } from '@/services/campaigns'
 import { triggerNotifications } from '@/services/notifications'
+import { getPartners, deletePartner } from '@/services/partners'
 import { CampaignCard } from '@/components/campaigns/CampaignCard'
 import { NewCampaignDialog } from '@/components/campaigns/NewCampaignDialog'
 import { PartnerDialog } from '@/components/campaigns/PartnerDialog'
-import type { Campaign } from '@/types'
+import type { Campaign, Partner } from '@/types'
 
 export default function Campanhas() {
   const { toast } = useToast()
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [partners, setPartners] = useState<Partner[]>([])
   const [loading, setLoading] = useState(true)
   const [notifying, setNotifying] = useState(false)
+  const [editPartner, setEditPartner] = useState<Partner | null>(null)
+  const [editPartnerOpen, setEditPartnerOpen] = useState(false)
 
   const load = () => {
     setLoading(true)
-    getCampaigns().then(({ data, error }) => {
-      if (error) toast({ title: 'Erro', description: error.message, variant: 'destructive' })
-      else setCampaigns(data || [])
+    Promise.all([getCampaigns(), getPartners()]).then(([campRes, partRes]) => {
+      if (campRes.error)
+        toast({ title: 'Erro', description: campRes.error.message, variant: 'destructive' })
+      else setCampaigns(campRes.data || [])
+      if (partRes.error)
+        toast({ title: 'Erro', description: partRes.error.message, variant: 'destructive' })
+      else setPartners(partRes.data || [])
       setLoading(false)
     })
   }
@@ -40,6 +48,20 @@ export default function Campanhas() {
         title: `${data?.count || 0} notificações processadas`,
         description: 'Mensagens disparadas com sucesso.',
       })
+  }
+
+  const handleDeletePartner = async (id: string) => {
+    const { error } = await deletePartner(id)
+    if (error) toast({ title: 'Erro', description: error.message, variant: 'destructive' })
+    else {
+      toast({ title: 'Parceiro removido!' })
+      load()
+    }
+  }
+
+  const handleEditPartner = (partner: Partner) => {
+    setEditPartner(partner)
+    setEditPartnerOpen(true)
   }
 
   return (
@@ -124,22 +146,46 @@ export default function Campanhas() {
               </CardHeader>
               <CardContent className="pt-6">
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between border-b pb-3">
-                    <div>
-                      <p className="font-semibold">Academia SmartFit</p>
-                      <p className="text-sm text-muted-foreground">Desconto de 10%</p>
-                    </div>
-                    <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200">
-                      Ativo
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between border-b pb-3">
-                    <div>
-                      <p className="font-semibold">Cervejaria Local</p>
-                      <p className="text-sm text-muted-foreground">1 Chopp Grátis</p>
-                    </div>
-                    <Badge variant="secondary">Pausado</Badge>
-                  </div>
+                  {partners.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-2">
+                      Nenhum parceiro cadastrado ainda.
+                    </p>
+                  ) : (
+                    partners.map((p) => (
+                      <div
+                        key={p.id}
+                        className="flex items-center justify-between border-b pb-3 last:border-0"
+                      >
+                        <div>
+                          <p className="font-semibold">{p.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Desconto de {p.discount_percentage}%
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200">
+                            Ativo
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleEditPartner(p)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 hover:text-destructive"
+                            onClick={() => handleDeletePartner(p.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  )}
                   <PartnerDialog onCreated={load} />
                 </div>
               </CardContent>
@@ -147,6 +193,13 @@ export default function Campanhas() {
           </div>
         </div>
       )}
+
+      <PartnerDialog
+        partner={editPartner}
+        open={editPartnerOpen}
+        onOpenChange={setEditPartnerOpen}
+        onCreated={load}
+      />
     </div>
   )
 }

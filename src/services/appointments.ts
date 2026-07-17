@@ -62,6 +62,16 @@ export async function createAppointment(data: {
   return { data: result as Appointment | null, error }
 }
 
+export async function getUniqueBarbers(): Promise<{ data: string[] | null; error: any }> {
+  const { data, error } = await db
+    .from('appointments')
+    .select('barber_name')
+    .not('barber_name', 'is', null)
+  if (error) return { data: null, error }
+  const unique = [...new Set((data || []).map((a: any) => a.barber_name).filter(Boolean))]
+  return { data: unique, error: null }
+}
+
 export async function updateAppointmentStatus(id: string, status: string) {
   const { data, error } = await db
     .from('appointments')

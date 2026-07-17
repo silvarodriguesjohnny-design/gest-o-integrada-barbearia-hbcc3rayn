@@ -49,7 +49,7 @@ export function Hero() {
           </div>
           <div className="flex items-center gap-2 text-sm">
             <Wallet className="h-5 w-5 text-amber-500" />
-            PDV integrado
+            Controle de Caixa integrado
           </div>
         </div>
       </div>

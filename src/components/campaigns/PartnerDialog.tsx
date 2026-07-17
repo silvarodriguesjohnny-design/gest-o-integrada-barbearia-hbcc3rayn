@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -10,18 +10,35 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Handshake, Loader2, Plus } from 'lucide-react'
-import { createCustomer } from '@/services/customers'
+import { Handshake, Loader2, Plus, Pencil } from 'lucide-react'
+import { createPartner, updatePartner } from '@/services/partners'
 import { useToast } from '@/hooks/use-toast'
+import type { Partner } from '@/types'
 
-export function PartnerDialog({ onCreated }: { onCreated: () => void }) {
+interface PartnerDialogProps {
+  onCreated: () => void
+  partner?: Partner | null
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+}
+
+export function PartnerDialog({ onCreated, partner, open, onOpenChange }: PartnerDialogProps) {
   const { toast } = useToast()
-  const [open, setOpen] = useState(false)
+  const isEdit = !!partner
+  const [internalOpen, setInternalOpen] = useState(false)
+  const isOpen = open !== undefined ? open : internalOpen
+  const setOpen = onOpenChange || setInternalOpen
+
   const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
   const [discount, setDiscount] = useState('0')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (isOpen) {
+      setName(partner?.name || '')
+      setDiscount(String(partner?.discount_percentage || 0))
+    }
+  }, [isOpen, partner])
 
   const handleSave = async () => {
     if (!name) {
@@ -29,20 +46,19 @@ export function PartnerDialog({ onCreated }: { onCreated: () => void }) {
       return
     }
     setLoading(true)
-    const { error } = await createCustomer({
-      name,
-      phone,
-      email,
-      discount_percentage: Number(discount) || 0,
-    })
+    const payload = { name, discount_percentage: Number(discount) || 0 }
+    const { error } = isEdit
+      ? await updatePartner(partner!.id, payload)
+      : await createPartner(payload)
     setLoading(false)
     if (error) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' })
     } else {
-      toast({ title: 'Parceiro cadastrado!', description: `${name} foi adicionado.` })
+      toast({
+        title: isEdit ? 'Parceiro atualizado!' : 'Parceiro cadastrado!',
+        description: `${name} foi ${isEdit ? 'atualizado' : 'adicionado'}.`,
+      })
       setName('')
-      setPhone('')
-      setEmail('')
       setDiscount('0')
       setOpen(false)
       onCreated()
@@ -50,19 +66,22 @@ export function PartnerDialog({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button
-          variant="outline"
-          className="w-full text-primary border-dashed border-2 hover:bg-accent/5 hover:text-accent hover:border-accent transition-colors"
-        >
-          <Plus className="h-4 w-4 mr-2" /> Adicionar Parceiro
-        </Button>
-      </DialogTrigger>
+    <Dialog open={isOpen} onOpenChange={setOpen}>
+      {!isEdit && (
+        <DialogTrigger asChild>
+          <Button
+            variant="outline"
+            className="w-full text-primary border-dashed border-2 hover:bg-accent/5 hover:text-accent hover:border-accent transition-colors"
+          >
+            <Plus className="h-4 w-4 mr-2" /> Adicionar Parceiro
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="font-serif text-2xl flex items-center gap-2">
-            <Handshake className="h-5 w-5 text-accent" /> Novo Parceiro
+            <Handshake className="h-5 w-5 text-accent" />
+            {isEdit ? 'Editar Parceiro' : 'Novo Parceiro'}
           </DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -73,24 +92,6 @@ export function PartnerDialog({ onCreated }: { onCreated: () => void }) {
               onChange={(e) => setName(e.target.value)}
               placeholder="Nome do parceiro"
             />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label className="font-semibold">Telefone</Label>
-              <Input
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="(11) 98765-4321"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="font-semibold">E-mail</Label>
-              <Input
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="parceiro@email.com"
-              />
-            </div>
           </div>
           <div className="space-y-2">
             <Label className="font-semibold">Porcentagem de Desconto (%)</Label>
@@ -113,7 +114,14 @@ export function PartnerDialog({ onCreated }: { onCreated: () => void }) {
             disabled={loading}
             className="bg-accent hover:bg-accent/90 text-white"
           >
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Cadastrar Parceiro
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isEdit ? (
+              <>
+                <Pencil className="mr-2 h-4 w-4" /> Salvar Alterações
+              </>
+            ) : (
+              'Cadastrar Parceiro'
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

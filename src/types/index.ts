@@ -100,6 +100,14 @@ export interface Campaign {
   created_at: string
 }
 
+export interface Partner {
+  id: string
+  name: string
+  discount_percentage: number
+  tenant_id: string | null
+  created_at: string
+}
+
 export interface DashboardMetrics {
   totalRevenue: number
   ticketMedio: number
