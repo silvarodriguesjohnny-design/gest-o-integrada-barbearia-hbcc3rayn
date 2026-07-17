@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart'
 import { LineChart, Line, ResponsiveContainer, PieChart, Pie, Cell, XAxis } from 'recharts'
 import {
@@ -10,15 +12,21 @@ import {
   Clock,
   DollarSign,
   Loader2,
+  Link2,
+  Copy,
+  Check,
 } from 'lucide-react'
 import { getDashboardMetrics } from '@/services/dashboard'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/hooks/use-auth'
 import type { DashboardMetrics } from '@/types'
 
 export default function Index() {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null)
   const [loading, setLoading] = useState(true)
+  const [copied, setCopied] = useState(false)
   const { toast } = useToast()
+  const { tenant } = useAuth()
 
   useEffect(() => {
     getDashboardMetrics().then(({ data, error }) => {
@@ -45,6 +53,15 @@ export default function Index() {
 
   const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
+  const bookingLink = tenant ? `${window.location.origin}/book/${tenant.id}` : ''
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(bookingLink)
+    setCopied(true)
+    toast({ title: 'Link copiado!', description: 'Envie para seus clientes agendarem online.' })
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -53,6 +70,31 @@ export default function Index() {
           Visão geral do desempenho da sua barbearia hoje.
         </p>
       </div>
+
+      {bookingLink && (
+        <Card className="hover:shadow-elevation transition-shadow">
+          <CardHeader className="bg-muted/20 border-b pb-4">
+            <CardTitle className="flex items-center gap-2 font-serif text-xl">
+              <Link2 className="h-5 w-5 text-accent" /> Link de Agendamento Público
+            </CardTitle>
+            <CardDescription>
+              Compartilhe este link para seus clientes agendarem online.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-2">
+              <Input readOnly value={bookingLink} className="bg-muted/50 font-mono text-sm" />
+              <Button variant="outline" size="icon" onClick={handleCopyLink}>
+                {copied ? (
+                  <Check className="h-4 w-4 text-emerald-600" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="hover:shadow-elevation transition-shadow">

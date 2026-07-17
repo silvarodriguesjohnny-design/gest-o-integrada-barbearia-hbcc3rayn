@@ -20,6 +20,7 @@ export function PartnerDialog({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
+  const [discount, setDiscount] = useState('0')
   const [loading, setLoading] = useState(false)
 
   const handleSave = async () => {
@@ -28,7 +29,12 @@ export function PartnerDialog({ onCreated }: { onCreated: () => void }) {
       return
     }
     setLoading(true)
-    const { error } = await createCustomer({ name, phone, email })
+    const { error } = await createCustomer({
+      name,
+      phone,
+      email,
+      discount_percentage: Number(discount) || 0,
+    })
     setLoading(false)
     if (error) {
       toast({ title: 'Erro', description: error.message, variant: 'destructive' })
@@ -37,6 +43,7 @@ export function PartnerDialog({ onCreated }: { onCreated: () => void }) {
       setName('')
       setPhone('')
       setEmail('')
+      setDiscount('0')
       setOpen(false)
       onCreated()
     }
@@ -67,21 +74,37 @@ export function PartnerDialog({ onCreated }: { onCreated: () => void }) {
               placeholder="Nome do parceiro"
             />
           </div>
-          <div className="space-y-2">
-            <Label className="font-semibold">Telefone</Label>
-            <Input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="(11) 98765-4321"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label className="font-semibold">Telefone</Label>
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="(11) 98765-4321"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-semibold">E-mail</Label>
+              <Input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="parceiro@email.com"
+              />
+            </div>
           </div>
           <div className="space-y-2">
-            <Label className="font-semibold">E-mail</Label>
+            <Label className="font-semibold">Porcentagem de Desconto (%)</Label>
             <Input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="parceiro@email.com"
+              type="number"
+              min="0"
+              max="100"
+              value={discount}
+              onChange={(e) => setDiscount(e.target.value)}
+              placeholder="0"
             />
+            <p className="text-xs text-muted-foreground">
+              Desconto aplicado aos clientes indicados por este parceiro.
+            </p>
           </div>
         </div>
         <DialogFooter>

@@ -33,6 +33,7 @@ export interface Customer {
   birthday: string | null
   created_at: string
   last_visit_at: string | null
+  discount_percentage?: number | null
 }
 
 export interface CustomerWithDetails extends Customer {
