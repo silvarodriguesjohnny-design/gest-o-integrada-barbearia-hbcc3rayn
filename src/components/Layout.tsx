@@ -23,6 +23,7 @@ import {
   Settings,
   Crown,
   MessageCircle,
+  UserPlus,
 } from 'lucide-react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Input } from '@/components/ui/input'
@@ -83,7 +84,14 @@ export default function Layout() {
                   {[
                     ...NAV_ITEMS,
                     ...(isSuperAdmin
-                      ? [{ name: 'Admin Financeiro', path: '/super-admin', icon: Crown }]
+                      ? [
+                          { name: 'Admin Financeiro', path: '/super-admin', icon: Crown },
+                          {
+                            name: 'Gerenciar Usuários',
+                            path: '/gerenciar-usuarios',
+                            icon: UserPlus,
+                          },
+                        ]
                       : []),
                   ].map((item) => {
                     const isActive = location.pathname === item.path

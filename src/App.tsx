@@ -13,6 +13,8 @@ import Financeiro from './pages/Financeiro'
 import Campanhas from './pages/Campanhas'
 import Settings from './pages/Settings'
 import SuperAdmin from './pages/SuperAdmin'
+import UserManagement from './pages/UserManagement'
+import SetPassword from './pages/SetPassword'
 import Onboarding from './pages/Onboarding'
 import TrialExpired from './pages/TrialExpired'
 import NotFound from './pages/NotFound'
@@ -58,6 +60,7 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/trial-expired" element={<TrialExpired />} />
+          <Route path="/set-password" element={<SetPassword />} />
           <Route
             element={
               <ProtectedRoute>
@@ -80,6 +83,7 @@ const App = () => (
             }
           >
             <Route path="/super-admin" element={<SuperAdmin />} />
+            <Route path="/gerenciar-usuarios" element={<UserManagement />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
