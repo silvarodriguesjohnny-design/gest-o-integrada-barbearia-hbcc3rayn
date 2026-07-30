@@ -46,7 +46,25 @@ const STATES = [
   'TO',
 ]
 
-const INITIAL = {
+interface FormState {
+  full_name: string
+  email: string
+  phone: string
+  cpf_cnpj: string
+  cep: string
+  rua: string
+  numero: string
+  complemento: string
+  bairro: string
+  cidade: string
+  estado: string
+  nome_negocio: string
+  numero_cadeiras: number
+  quantidade_profissionais: number
+  horario_funcionamento: string
+}
+
+const INITIAL: FormState = {
   full_name: '',
   email: '',
   phone: '',
@@ -64,15 +82,45 @@ const INITIAL = {
   horario_funcionamento: '',
 }
 
+type FormErrors = Partial<Record<keyof FormState, string>>
+
+function validate(form: FormState): FormErrors {
+  const e: FormErrors = {}
+  if (!form.full_name.trim()) e.full_name = 'Nome completo é obrigatório'
+  if (!form.email.trim()) e.email = 'E-mail é obrigatório'
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'E-mail inválido'
+  if (!form.phone.trim()) e.phone = 'Telefone é obrigatório'
+  if (!isValidCpfCnpj(form.cpf_cnpj)) e.cpf_cnpj = 'CPF (11) ou CNPJ (14) dígitos'
+  if (form.cep.replace(/\D/g, '').length !== 8) e.cep = 'CEP deve ter 8 dígitos'
+  if (!form.rua.trim()) e.rua = 'Rua é obrigatória'
+  if (!form.numero.trim()) e.numero = 'Número é obrigatório'
+  if (!form.bairro.trim()) e.bairro = 'Bairro é obrigatório'
+  if (!form.cidade.trim()) e.cidade = 'Cidade é obrigatória'
+  if (!form.estado) e.estado = 'Selecione o estado'
+  if (!form.nome_negocio.trim()) e.nome_negocio = 'Nome da barbearia é obrigatório'
+  if (form.numero_cadeiras < 1) e.numero_cadeiras = 'Mínimo 1'
+  if (form.quantidade_profissionais < 1) e.quantidade_profissionais = 'Mínimo 1'
+  if (!form.horario_funcionamento.trim()) e.horario_funcionamento = 'Horário é obrigatório'
+  return e
+}
+
+function Err({ msg }: { msg?: string }) {
+  if (!msg) return null
+  return <p className="text-xs text-destructive mt-1">{msg}</p>
+}
+
 export default function Onboarding() {
   const navigate = useNavigate()
   const { toast } = useToast()
-  const [form, setForm] = useState(INITIAL)
+  const [form, setForm] = useState<FormState>(INITIAL)
+  const [errors, setErrors] = useState<FormErrors>({})
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
 
-  const update = (key: string, value: string | number) =>
+  const update = (key: keyof FormState, value: string | number) => {
     setForm((prev) => ({ ...prev, [key]: value }))
+    if (errors[key]) setErrors((prev) => ({ ...prev, [key]: undefined }))
+  }
 
   const handleCepBlur = async () => {
     const cep = form.cep.replace(/\D/g, '')
@@ -96,10 +144,12 @@ export default function Onboarding() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!isValidCpfCnpj(form.cpf_cnpj)) {
+    const foundErrors = validate(form)
+    if (Object.keys(foundErrors).length > 0) {
+      setErrors(foundErrors)
       toast({
-        title: 'CPF/CNPJ inválido',
-        description: 'Digite um CPF (11 dígitos) ou CNPJ (14 dígitos).',
+        title: 'Verifique os campos',
+        description: 'Corrija os campos destacados.',
         variant: 'destructive',
       })
       return
@@ -115,10 +165,11 @@ export default function Onboarding() {
     if (error) {
       toast({
         title: 'Erro ao enviar cadastro',
-        description: error.message,
+        description: 'Tente novamente.',
         variant: 'destructive',
       })
     } else {
+      toast({ title: 'Cadastro enviado com sucesso!', description: 'Aguarde a aprovação.' })
       setSuccess(true)
     }
   }
@@ -170,8 +221,8 @@ export default function Onboarding() {
                 <Input
                   value={form.full_name}
                   onChange={(e) => update('full_name', e.target.value)}
-                  required
                 />
+                <Err msg={errors.full_name} />
               </div>
               <div className="space-y-2">
                 <Label className="font-semibold">E-mail *</Label>
@@ -179,8 +230,8 @@ export default function Onboarding() {
                   type="email"
                   value={form.email}
                   onChange={(e) => update('email', e.target.value)}
-                  required
                 />
+                <Err msg={errors.email} />
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -191,8 +242,8 @@ export default function Onboarding() {
                   placeholder="(11) 99999-9999"
                   value={form.phone}
                   onChange={(e) => update('phone', formatPhone(e.target.value))}
-                  required
                 />
+                <Err msg={errors.phone} />
               </div>
               <div className="space-y-2">
                 <Label className="font-semibold">CPF ou CNPJ *</Label>
@@ -200,8 +251,8 @@ export default function Onboarding() {
                   placeholder="000.000.000-00 ou 00.000.000/0000-00"
                   value={form.cpf_cnpj}
                   onChange={(e) => update('cpf_cnpj', formatCpfCnpj(e.target.value))}
-                  required
                 />
+                <Err msg={errors.cpf_cnpj} />
               </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -212,22 +263,20 @@ export default function Onboarding() {
                   value={form.cep}
                   onChange={(e) => update('cep', formatCep(e.target.value))}
                   onBlur={handleCepBlur}
-                  required
                 />
+                <Err msg={errors.cep} />
               </div>
               <div className="space-y-2 col-span-1 sm:col-span-2">
                 <Label className="font-semibold">Rua *</Label>
-                <Input value={form.rua} onChange={(e) => update('rua', e.target.value)} required />
+                <Input value={form.rua} onChange={(e) => update('rua', e.target.value)} />
+                <Err msg={errors.rua} />
               </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="space-y-2">
                 <Label className="font-semibold">Número *</Label>
-                <Input
-                  value={form.numero}
-                  onChange={(e) => update('numero', e.target.value)}
-                  required
-                />
+                <Input value={form.numero} onChange={(e) => update('numero', e.target.value)} />
+                <Err msg={errors.numero} />
               </div>
               <div className="space-y-2 col-span-1 sm:col-span-2">
                 <Label className="font-semibold">Complemento</Label>
@@ -238,21 +287,15 @@ export default function Onboarding() {
               </div>
               <div className="space-y-2">
                 <Label className="font-semibold">Bairro *</Label>
-                <Input
-                  value={form.bairro}
-                  onChange={(e) => update('bairro', e.target.value)}
-                  required
-                />
+                <Input value={form.bairro} onChange={(e) => update('bairro', e.target.value)} />
+                <Err msg={errors.bairro} />
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="font-semibold">Cidade *</Label>
-                <Input
-                  value={form.cidade}
-                  onChange={(e) => update('cidade', e.target.value)}
-                  required
-                />
+                <Input value={form.cidade} onChange={(e) => update('cidade', e.target.value)} />
+                <Err msg={errors.cidade} />
               </div>
               <div className="space-y-2">
                 <Label className="font-semibold">Estado *</Label>
@@ -268,6 +311,7 @@ export default function Onboarding() {
                     ))}
                   </SelectContent>
                 </Select>
+                <Err msg={errors.estado} />
               </div>
             </div>
             <div className="space-y-2">
@@ -276,31 +320,31 @@ export default function Onboarding() {
                 placeholder="Ex: Barbearia do João"
                 value={form.nome_negocio}
                 onChange={(e) => update('nome_negocio', e.target.value)}
-                required
               />
+              <Err msg={errors.nome_negocio} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label className="font-semibold">Nº de cadeiras *</Label>
                 <Input
                   type="number"
-                  min={0}
+                  min={1}
                   value={form.numero_cadeiras}
                   onChange={(e) => update('numero_cadeiras', parseInt(e.target.value) || 0)}
-                  required
                 />
+                <Err msg={errors.numero_cadeiras} />
               </div>
               <div className="space-y-2">
                 <Label className="font-semibold">Nº de profissionais *</Label>
                 <Input
                   type="number"
-                  min={0}
+                  min={1}
                   value={form.quantidade_profissionais}
                   onChange={(e) =>
                     update('quantidade_profissionais', parseInt(e.target.value) || 0)
                   }
-                  required
                 />
+                <Err msg={errors.quantidade_profissionais} />
               </div>
               <div className="space-y-2">
                 <Label className="font-semibold">Horário *</Label>
@@ -308,8 +352,8 @@ export default function Onboarding() {
                   placeholder="Seg-Sex 08-18h"
                   value={form.horario_funcionamento}
                   onChange={(e) => update('horario_funcionamento', e.target.value)}
-                  required
                 />
+                <Err msg={errors.horario_funcionamento} />
               </div>
             </div>
             <Button type="submit" className="w-full h-12 text-base" disabled={loading}>

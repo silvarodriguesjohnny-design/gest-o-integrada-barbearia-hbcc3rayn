@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase/client'
+import { publicSupabase } from '@/lib/supabase/public-client'
 
 export async function submitRegistration(data: Record<string, unknown>) {
   const payload = {
@@ -20,7 +21,7 @@ export async function submitRegistration(data: Record<string, unknown>) {
     status: 'pending',
   }
 
-  const { data: result, error } = await supabase
+  const { data: result, error } = await publicSupabase
     .from('pending_tenants')
     .insert(payload)
     .select()
@@ -28,7 +29,7 @@ export async function submitRegistration(data: Record<string, unknown>) {
 
   if (error) return { data: null, error }
 
-  await supabase.functions
+  await publicSupabase.functions
     .invoke('send-email', {
       body: {
         to: data.email as string,
