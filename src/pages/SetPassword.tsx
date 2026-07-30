@@ -19,29 +19,29 @@ export default function SetPassword() {
   const [success, setSuccess] = useState(false)
 
   useEffect(() => {
-    const code = searchParams.get('code')
-    if (code) {
-      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-        if (error) {
-          toast({
-            title: 'Erro',
-            description: 'Link inválido ou expirado.',
-            variant: 'destructive',
-          })
-          navigate('/login')
-        } else {
-          setLoading(false)
-        }
-      })
-    } else {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
-          setLoading(false)
-        } else {
-          navigate('/login')
-        }
-      })
-    }
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        setLoading(false)
+        return
+      }
+      const code = searchParams.get('code')
+      if (code) {
+        supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+          if (error) {
+            toast({
+              title: 'Erro',
+              description: 'Link inválido ou expirado.',
+              variant: 'destructive',
+            })
+            navigate('/login')
+          } else {
+            setLoading(false)
+          }
+        })
+      } else {
+        navigate('/login')
+      }
+    })
   }, [searchParams, navigate, toast])
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -34,6 +34,8 @@ import { redeemReward } from '@/services/loyalty'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import type { CustomerWithDetails, Service } from '@/types'
+import { PendingTenants } from '@/components/PendingTenants'
+import { useAuth } from '@/hooks/use-auth'
 
 export default function Clientes() {
   const [searchTerm, setSearchTerm] = useState('')
@@ -41,6 +43,7 @@ export default function Clientes() {
   const [loading, setLoading] = useState(true)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const { toast } = useToast()
+  const { isSuperAdmin } = useAuth()
 
   const load = () => {
     setLoading(true)
@@ -93,6 +96,8 @@ export default function Clientes() {
           </Button>
         </div>
       </div>
+
+      {isSuperAdmin && <PendingTenants />}
 
       <Card className="hover:shadow-elevation transition-shadow">
         <Table>

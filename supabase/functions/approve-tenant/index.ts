@@ -8,8 +8,8 @@ const corsHeaders = {
     'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
 }
 
-function generatePassword(length = 12): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%'
+function generatePassword(length = 16): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*'
   const bytes = new Uint8Array(length)
   crypto.getRandomValues(bytes)
   let result = ''
@@ -61,12 +61,11 @@ Deno.serve(async (req: Request) => {
       .select('is_super_admin')
       .eq('id', user.id)
       .single()
-    if (!callerProfile?.is_super_admin) {
+    if (!callerProfile?.is_super_admin)
       return new Response(
         JSON.stringify({ error: 'Apenas super admins podem aprovar cadastros.' }),
         { status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders } },
       )
-    }
 
     const body = await req.json()
     let data: any
@@ -139,23 +138,44 @@ Deno.serve(async (req: Request) => {
 
     const origin =
       req.headers.get('origin') || 'https://gestao-integrada-barbearia-a3c26.goskip.app'
+
+    // Send password reset email via Supabase recover endpoint (sends real email with one-time token)
+    const resetRes = await fetch(`${supabaseUrl}/auth/v1/recover`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: anonKey },
+      body: JSON.stringify({ email: data.email, redirectTo: `${origin}/set-password` }),
+    })
+
+    // Log email for audit
     await adminClient.from('email_logs').insert({
       tenant_id: tenant.id,
       recipient: data.email,
-      subject: 'Bem-vindo ao Na Régua! Sua barbearia foi aprovada',
-      body: `Olá ${data.full_name}! Sua barbearia "${data.nome_negocio}" foi aprovada.\n\nEmail: ${data.email}\nSenha temporária: ${tempPassword}\nAcesse: ${origin}/login`,
-      status: 'simulated',
+      subject: 'Sua conta foi aprovada!',
+      body: `Olá ${data.full_name}! Sua barbearia "${data.nome_negocio}" foi aprovada.\n\nAcesse o link enviado para seu email para definir sua senha e acessar o sistema.\n\nLink: ${origin}/set-password`,
+      status: resetRes.ok ? 'sent' : 'failed',
     })
+
+    // Create invitation record
+    await adminClient.from('invitations').insert({
+      email: data.email,
+      role: 'admin',
+      tenant_id: tenant.id,
+      invited_by: user.id,
+      status: 'approved',
+    })
+
+    const message = resetRes.ok
+      ? 'Barbearia aprovada com sucesso. Email de definição de senha enviado.'
+      : 'Barbearia aprovada, mas houve erro ao enviar email. O usuário pode redefinir a senha na página de login.'
 
     return new Response(
       JSON.stringify({
         success: true,
         tenant_id: tenant.id,
-        message: 'Barbearia aprovada com sucesso.',
+        email_sent: resetRes.ok,
+        message,
       }),
-      {
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      },
+      { headers: { 'Content-Type': 'application/json', ...corsHeaders } },
     )
   } catch (err) {
     return new Response(JSON.stringify({ error: 'Erro interno', detail: String(err) }), {
