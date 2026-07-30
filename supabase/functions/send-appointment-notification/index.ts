@@ -4,8 +4,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
 }
 
 Deno.serve(async (req: Request) => {
@@ -20,16 +19,13 @@ Deno.serve(async (req: Request) => {
 
     const { data: appt, error: apptError } = await supabase
       .from('appointments')
-      .select(
-        '*, customer:customers(name, phone, email), service:services(name, price, duration_minutes), tenant:tenants(name, slug)',
-      )
+      .select('*, customer:customers(name, phone, email), service:services(name, price, duration_minutes), tenant:tenants(name, slug)')
       .eq('id', appointment_id)
       .single()
 
     if (apptError || !appt) {
       return new Response(JSON.stringify({ error: 'Agendamento não encontrado.' }), {
-        status: 404,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders },
       })
     }
 
@@ -65,8 +61,7 @@ Deno.serve(async (req: Request) => {
     })
   } catch (err) {
     return new Response(JSON.stringify({ error: 'Erro interno', detail: String(err) }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders },
     })
   }
 })
