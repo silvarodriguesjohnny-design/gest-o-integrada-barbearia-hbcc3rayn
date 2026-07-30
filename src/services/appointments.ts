@@ -59,6 +59,14 @@ export async function createAppointment(data: {
     .select('*')
     .single()
 
+  if (result) {
+    db.functions
+      .invoke('send-appointment-notification', {
+        body: { appointment_id: result.id, type: 'confirmation' },
+      })
+      .catch(() => {})
+  }
+
   return { data: result as Appointment | null, error }
 }
 

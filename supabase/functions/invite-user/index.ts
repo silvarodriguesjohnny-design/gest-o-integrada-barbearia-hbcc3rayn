@@ -41,7 +41,10 @@ Deno.serve(async (req: Request) => {
       auth: { autoRefreshToken: false, persistSession: false },
     })
 
-    const { data: { user }, error: userError } = await userClient.auth.getUser()
+    const {
+      data: { user },
+      error: userError,
+    } = await userClient.auth.getUser()
     if (userError || !user) {
       return new Response(JSON.stringify({ error: 'Não autorizado.' }), {
         status: 401,
@@ -95,9 +98,10 @@ Deno.serve(async (req: Request) => {
 
     if (createError) {
       const lower = createError.message.toLowerCase()
-      const msg = lower.includes('already') || lower.includes('registered') || lower.includes('taken')
-        ? 'Este email já está cadastrado.'
-        : createError.message
+      const msg =
+        lower.includes('already') || lower.includes('registered') || lower.includes('taken')
+          ? 'Este email já está cadastrado.'
+          : createError.message
       return new Response(JSON.stringify({ error: msg }), {
         status: 400,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
@@ -105,8 +109,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const origin =
-      req.headers.get('origin') ||
-      'https://gestao-integrada-barbearia-a3c26.goskip.app'
+      req.headers.get('origin') || 'https://gestao-integrada-barbearia-a3c26.goskip.app'
 
     const resetRes = await fetch(`${supabaseUrl}/auth/v1/recover`, {
       method: 'POST',

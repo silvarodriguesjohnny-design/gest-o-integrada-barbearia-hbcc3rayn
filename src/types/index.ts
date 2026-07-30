@@ -118,3 +118,43 @@ export interface DashboardMetrics {
   serviceData: { name: string; value: number; fill: string }[]
   recentAppointments: AppointmentWithRelations[]
 }
+
+export interface PendingTenant {
+  id: string
+  full_name: string
+  email: string
+  phone: string | null
+  cpf_cnpj: string | null
+  cep: string | null
+  rua: string | null
+  numero: string | null
+  complemento: string | null
+  bairro: string | null
+  cidade: string | null
+  estado: string | null
+  nome_negocio: string
+  numero_cadeiras: number
+  quantidade_profissionais: number
+  horario_funcionamento: string | null
+  status: string
+  created_at: string
+}
+
+export interface InactivityAlert {
+  id: string
+  tenant_id: string
+  days: number
+  message: string
+  channels: string[]
+  active: boolean
+  created_at: string
+}
+
+export interface MessagingConfig {
+  id: string
+  tenant_id: string
+  channel: string
+  config_json: Record<string, unknown>
+  is_active: boolean
+  created_at: string
+}

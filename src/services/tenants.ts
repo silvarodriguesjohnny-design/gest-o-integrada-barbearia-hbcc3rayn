@@ -2,12 +2,32 @@ import { db } from './db'
 import { supabase } from '@/lib/supabase/client'
 import type { Tenant, PlanType } from '@/types'
 
+export function generateSlug(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '') +
+    '-' +
+    Math.random().toString(36).substring(2, 8)
+  )
+}
+
 export async function createTenant(data: {
   name: string
   owner_id: string
   plan_type: PlanType
+  slug?: string
+  status?: string
 }): Promise<{ data: Tenant | null; error: any }> {
-  const { data: result, error } = await db.from('tenants').insert(data).select().single()
+  const insertData = {
+    ...data,
+    slug: data.slug || generateSlug(data.name),
+    status: data.status || 'active',
+  }
+  const { data: result, error } = await db.from('tenants').insert(insertData).select().single()
   return { data: result, error }
 }
 
