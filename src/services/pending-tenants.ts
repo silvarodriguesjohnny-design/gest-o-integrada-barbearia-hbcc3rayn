@@ -1,14 +1,17 @@
 import { supabase } from '@/lib/supabase/client'
-import { db } from './db'
 
 export async function submitRegistration(data: Record<string, unknown>) {
-  const { data: result, error } = await db.from('pending_tenants').insert(data).select().single()
+  const { data: result, error } = await supabase
+    .from('pending_tenants')
+    .insert(data)
+    .select()
+    .single()
   if (error) return { data: null, error }
 
   await supabase.functions
     .invoke('send-email', {
       body: {
-        to: data.email,
+        to: data.email as string,
         subject: 'Seu cadastro está em análise – Na Régua',
         body: `Olá ${data.full_name},\n\nRecebemos seu cadastro para a barbearia "${data.nome_negocio}".\nSeu cadastro está em análise e você será notificado quando for aprovado.\n\nAtenciosamente,\nEquipe Na Régua`,
       },
@@ -19,7 +22,7 @@ export async function submitRegistration(data: Record<string, unknown>) {
 }
 
 export async function getPendingTenants() {
-  const { data, error } = await db
+  const { data, error } = await supabase
     .from('pending_tenants')
     .select('*')
     .order('created_at', { ascending: false })
@@ -27,7 +30,7 @@ export async function getPendingTenants() {
 }
 
 export async function rejectPendingTenant(id: string) {
-  const { data, error } = await db
+  const { data, error } = await supabase
     .from('pending_tenants')
     .update({ status: 'rejected' })
     .eq('id', id)
