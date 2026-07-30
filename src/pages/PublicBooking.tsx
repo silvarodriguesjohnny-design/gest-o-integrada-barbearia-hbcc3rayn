@@ -16,7 +16,7 @@ import {
 import { cn } from '@/lib/utils'
 
 export default function PublicBooking() {
-  const { slug } = useParams<{ slug: string }>()
+  const { tenantId } = useParams<{ tenantId: string }>()
   const { toast } = useToast()
   const [tenant, setTenant] = useState<any>(null)
   const [services, setServices] = useState<PublicService[]>([])
@@ -33,8 +33,8 @@ export default function PublicBooking() {
   const [done, setDone] = useState(false)
 
   useEffect(() => {
-    if (!slug) return
-    getTenantData(slug).then(({ data, error }) => {
+    if (!tenantId) return
+    getTenantData(tenantId).then(({ data, error }) => {
       if (error || !data) {
         toast({ title: 'Erro', description: 'Barbearia não encontrada.', variant: 'destructive' })
       } else {
@@ -43,29 +43,29 @@ export default function PublicBooking() {
       }
       setLoading(false)
     })
-  }, [slug])
+  }, [tenantId])
 
   useEffect(() => {
-    if (!slug || !date) return
+    if (!tenantId || !date) return
     setLoadingSlots(true)
     setSelectedSlot('')
-    getSlots(slug, date).then(({ data }) => {
+    getSlots(tenantId, date).then(({ data }) => {
       if (data) {
         const duration = selectedService?.duration_minutes || 30
         setSlots(calculateAvailableSlots(data.appointments, duration, new Date(date)))
       }
       setLoadingSlots(false)
     })
-  }, [slug, date, selectedService])
+  }, [tenantId, date, selectedService])
 
   const handleBook = async () => {
-    if (!slug || !selectedService || !selectedSlot || !name || !phone) {
+    if (!tenantId || !selectedService || !selectedSlot || !name || !phone) {
       toast({ title: 'Preencha todos os campos', variant: 'destructive' })
       return
     }
     setBooking(true)
     const { error } = await createBooking({
-      slug,
+      tenant_id: tenantId,
       service_id: selectedService.id,
       customer_name: name,
       customer_phone: phone,

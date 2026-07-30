@@ -6,6 +6,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { Loader2 } from 'lucide-react'
 import { AuthProvider, useAuth } from '@/hooks/use-auth'
 import Landing from './pages/Landing'
+import PublicBooking from './pages/PublicBooking'
 import Index from './pages/Index'
 import Clientes from './pages/Clientes'
 import Agenda from './pages/Agenda'
@@ -58,6 +59,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/book/:tenantId" element={<PublicBooking />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/trial-expired" element={<TrialExpired />} />
           <Route path="/set-password" element={<SetPassword />} />

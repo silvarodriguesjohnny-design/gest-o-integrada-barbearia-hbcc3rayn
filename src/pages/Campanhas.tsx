@@ -10,6 +10,7 @@ import { getPartners, deletePartner } from '@/services/partners'
 import { CampaignCard } from '@/components/campaigns/CampaignCard'
 import { NewCampaignDialog } from '@/components/campaigns/NewCampaignDialog'
 import { PartnerDialog } from '@/components/campaigns/PartnerDialog'
+import { InactivityAlertDialog } from '@/components/campaigns/InactivityAlertDialog'
 import type { Campaign, Partner } from '@/types'
 
 export default function Campanhas() {
@@ -127,13 +128,7 @@ export default function Campanhas() {
                   Envia automaticamente uma mensagem de resgate para clientes que não visitam a
                   barbearia há mais de <strong className="text-destructive">60 dias</strong>.
                 </p>
-                <Button
-                  variant="destructive"
-                  className="w-full transition-transform active:scale-95"
-                  onClick={handleNotify}
-                >
-                  Configurar e Disparar
-                </Button>
+                <InactivityAlertDialog />
               </CardContent>
             </Card>
 

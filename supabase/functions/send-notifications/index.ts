@@ -1,5 +1,5 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,23 +8,17 @@ const corsHeaders = {
     'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
 }
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-const whatsappApiKey = Deno.env.get('WHATSAPP_API_KEY') ?? ''
-
 Deno.serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
-  }
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   const supabase = createClient(supabaseUrl, serviceRoleKey)
 
   let body: Record<string, unknown> = {}
   try {
     body = await req.json()
-  } catch {
-    // No body or invalid JSON — proceed with default notification processing
-  }
+  } catch {}
 
   if (body.action === 'new_tenant') {
     const { data: superAdmin } = await supabase
@@ -46,10 +40,6 @@ Deno.serve(async (req: Request) => {
       timestamp: new Date().toISOString(),
     }
 
-    if (whatsappApiKey) {
-      // TODO: Send WhatsApp alert to super admin
-    }
-
     return new Response(JSON.stringify({ success: true, notification }), {
       headers: { 'Content-Type': 'application/json', ...corsHeaders },
     })
@@ -59,47 +49,65 @@ Deno.serve(async (req: Request) => {
   const todayMonthDay = `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 
   try {
-    const [confirmedRes, birthdayRes, inactiveRes] = await Promise.all([
-      supabase
-        .from('appointments')
-        .select('*, customer:customers(*), service:services(*)')
-        .in('status', ['scheduled', 'confirmed'])
-        .gte('start_time', today.toISOString()),
-      supabase.from('customers').select('*').filter('birthday', 'like', `%-${todayMonthDay}`),
-      supabase.from('inactive_customers').select('*'),
-    ])
+    const { data: confirmedAppts } = await supabase
+      .from('appointments')
+      .select('*, customer:customers(*), service:services(*), tenant:tenants(name)')
+      .in('status', ['scheduled', 'confirmed'])
+      .gte('start_time', today.toISOString())
+
+    const { data: birthdayCustomers } = await supabase
+      .from('customers')
+      .select('*')
+      .filter('birthday', 'like', `%-${todayMonthDay}`)
+
+    const { data: alerts } = await supabase
+      .from('inactivity_alerts')
+      .select('*, tenants(id, name)')
+      .eq('active', true)
 
     const notifications: Record<string, unknown>[] = []
 
-    for (const appt of confirmedRes.data ?? []) {
+    for (const appt of confirmedAppts ?? []) {
       notifications.push({
         type: 'appointment_reminder',
         customer: appt.customer?.name,
         phone: appt.customer?.phone,
+        tenant_id: appt.tenant_id,
         message: `Olá ${appt.customer?.name}! Você tem um agendamento para ${appt.service?.name} em ${new Date(appt.start_time).toLocaleString('pt-BR')}.`,
       })
     }
 
-    for (const customer of birthdayRes.data ?? []) {
+    for (const customer of birthdayCustomers ?? []) {
       notifications.push({
         type: 'birthday',
         customer: customer.name,
         phone: customer.phone,
+        tenant_id: customer.tenant_id,
         message: `Feliz aniversário ${customer.name}! Venha comemorar com a gente!`,
       })
     }
 
-    for (const customer of inactiveRes.data ?? []) {
-      notifications.push({
-        type: 'inactivity_alert',
-        customer: customer.name,
-        phone: customer.phone,
-        message: `Olá ${customer.name}, sentimos sua falta! Volta pra gente dar um trato no visual.`,
-      })
-    }
+    for (const alert of alerts ?? []) {
+      const cutoffDate = new Date(today)
+      cutoffDate.setDate(cutoffDate.getDate() - alert.days)
 
-    if (whatsappApiKey && notifications.length > 0) {
-      // TODO: Integrate with WhatsApp API using whatsappApiKey
+      const { data: inactiveCustomers } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('tenant_id', alert.tenant_id)
+        .or(`last_visit_at.is.null,last_visit_at.lt.${cutoffDate.toISOString()}`)
+
+      for (const customer of inactiveCustomers ?? []) {
+        const msg = (alert.message || '').replace(/\{nome\}/g, customer.name || '')
+        notifications.push({
+          type: 'inactivity_alert',
+          customer: customer.name,
+          phone: customer.phone,
+          tenant_id: alert.tenant_id,
+          channels: alert.channels,
+          message: msg,
+        })
+      }
     }
 
     return new Response(

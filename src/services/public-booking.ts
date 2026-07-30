@@ -21,22 +21,22 @@ export interface SlotAppointment {
   end_time: string
 }
 
-export async function getTenantData(slug: string) {
+export async function getTenantData(tenantId: string) {
   const { data, error } = await supabase.functions.invoke('public-booking', {
-    body: { action: 'get_tenant', slug },
+    body: { action: 'get_tenant', tenant_id: tenantId },
   })
   return { data: data as { tenant: PublicTenant; services: PublicService[] } | null, error }
 }
 
-export async function getSlots(slug: string, date: string) {
+export async function getSlots(tenantId: string, date: string) {
   const { data, error } = await supabase.functions.invoke('public-booking', {
-    body: { action: 'get_slots', slug, date },
+    body: { action: 'get_slots', tenant_id: tenantId, date },
   })
   return { data: data as { appointments: SlotAppointment[] } | null, error }
 }
 
 export async function createBooking(data: {
-  slug: string
+  tenant_id: string
   service_id: string
   customer_name: string
   customer_phone: string
