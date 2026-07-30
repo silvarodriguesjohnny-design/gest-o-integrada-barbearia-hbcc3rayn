@@ -9,6 +9,6 @@
     "send-appointment-notification": 1,
     "public-booking": 1,
     "create-operator": 1,
-    "approve-tenant": 1
+    "approve-tenant": 2
   }
 }
