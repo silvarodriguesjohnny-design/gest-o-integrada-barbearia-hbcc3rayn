@@ -35,6 +35,7 @@ import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import type { CustomerWithDetails, Service } from '@/types'
 import { PendingTenants } from '@/components/PendingTenants'
+import { NewPendingTenantDialog } from '@/components/NewPendingTenantDialog'
 import { useAuth } from '@/hooks/use-auth'
 
 export default function Clientes() {
@@ -42,6 +43,8 @@ export default function Clientes() {
   const [customers, setCustomers] = useState<CustomerWithDetails[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddDialog, setShowAddDialog] = useState(false)
+  const [showPendingDialog, setShowPendingDialog] = useState(false)
+  const [pendingRefresh, setPendingRefresh] = useState(0)
   const { toast } = useToast()
   const { isSuperAdmin } = useAuth()
 
@@ -90,14 +93,14 @@ export default function Clientes() {
           </Button>
           <Button
             className="bg-accent hover:bg-accent/90 text-white"
-            onClick={() => setShowAddDialog(true)}
+            onClick={() => (isSuperAdmin ? setShowPendingDialog(true) : setShowAddDialog(true))}
           >
             <Plus className="h-4 w-4 mr-2" /> Novo Cliente
           </Button>
         </div>
       </div>
 
-      {isSuperAdmin && <PendingTenants />}
+      {isSuperAdmin && <PendingTenants refreshTrigger={pendingRefresh} />}
 
       <Card className="hover:shadow-elevation transition-shadow">
         <Table>
@@ -163,7 +166,18 @@ export default function Clientes() {
         </Table>
       </Card>
 
-      <AddCustomerDialog open={showAddDialog} onOpenChange={setShowAddDialog} onCreated={load} />
+      {isSuperAdmin ? (
+        <NewPendingTenantDialog
+          open={showPendingDialog}
+          onOpenChange={setShowPendingDialog}
+          onCreated={() => {
+            load()
+            setPendingRefresh((p) => p + 1)
+          }}
+        />
+      ) : (
+        <AddCustomerDialog open={showAddDialog} onOpenChange={setShowAddDialog} onCreated={load} />
+      )}
     </div>
   )
 }

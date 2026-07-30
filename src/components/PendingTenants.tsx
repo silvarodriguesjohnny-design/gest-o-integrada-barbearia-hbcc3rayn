@@ -7,7 +7,7 @@ import { getPendingTenants, approveTenant, rejectPendingTenant } from '@/service
 import { useToast } from '@/hooks/use-toast'
 import type { PendingTenant } from '@/types'
 
-export function PendingTenants() {
+export function PendingTenants({ refreshTrigger }: { refreshTrigger?: number }) {
   const [tenants, setTenants] = useState<PendingTenant[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
@@ -24,7 +24,7 @@ export function PendingTenants() {
 
   useEffect(() => {
     load()
-  }, [])
+  }, [refreshTrigger])
 
   const handleApprove = async (id: string) => {
     setActionLoading(id)
