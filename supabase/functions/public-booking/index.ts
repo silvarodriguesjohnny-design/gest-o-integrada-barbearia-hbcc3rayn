@@ -4,8 +4,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
 }
 
 Deno.serve(async (req: Request) => {
@@ -28,8 +27,7 @@ Deno.serve(async (req: Request) => {
         .single()
       if (tError || !tenant) {
         return new Response(JSON.stringify({ error: 'Barbearia não encontrada.' }), {
-          status: 404,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders },
         })
       }
       const { data: services } = await supabase
@@ -43,10 +41,8 @@ Deno.serve(async (req: Request) => {
 
     if (action === 'get_slots') {
       const { date } = body
-      const start = new Date(date)
-      start.setHours(0, 0, 0, 0)
-      const end = new Date(date)
-      end.setHours(23, 59, 59, 999)
+      const start = new Date(date); start.setHours(0, 0, 0, 0)
+      const end = new Date(date); end.setHours(23, 59, 59, 999)
       const { data: appointments } = await supabase
         .from('appointments')
         .select('start_time, end_time')
@@ -68,8 +64,7 @@ Deno.serve(async (req: Request) => {
         .single()
       if (!tenant) {
         return new Response(JSON.stringify({ error: 'Tenant não encontrado' }), {
-          status: 404,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders },
         })
       }
       const { data: service } = await supabase
@@ -79,8 +74,7 @@ Deno.serve(async (req: Request) => {
         .single()
       if (!service) {
         return new Response(JSON.stringify({ error: 'Serviço não encontrado' }), {
-          status: 404,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders },
         })
       }
 
@@ -106,8 +100,7 @@ Deno.serve(async (req: Request) => {
           .single()
         if (cError) {
           return new Response(JSON.stringify({ error: cError.message }), {
-            status: 500,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders },
+            status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders },
           })
         }
         customerId = newCustomer.id
@@ -129,8 +122,7 @@ Deno.serve(async (req: Request) => {
         .single()
       if (aError) {
         return new Response(JSON.stringify({ error: aError.message }), {
-          status: 500,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+          status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders },
         })
       }
 
@@ -148,13 +140,11 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(JSON.stringify({ error: 'Ação inválida' }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders },
     })
   } catch (err) {
     return new Response(JSON.stringify({ error: 'Erro interno', detail: String(err) }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders },
     })
   }
 })
