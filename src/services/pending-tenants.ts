@@ -1,11 +1,31 @@
 import { supabase } from '@/lib/supabase/client'
 
 export async function submitRegistration(data: Record<string, unknown>) {
+  const payload = {
+    full_name: data.full_name,
+    email: data.email,
+    phone: data.phone,
+    cpf_cnpj: data.cpf_cnpj,
+    cep: data.cep,
+    rua: data.rua,
+    numero: data.numero,
+    complemento: data.complemento,
+    bairro: data.bairro,
+    cidade: data.cidade,
+    estado: data.estado,
+    nome_negocio: data.nome_negocio,
+    numero_cadeiras: data.numero_cadeiras,
+    quantidade_profissionais: data.quantidade_profissionais,
+    horario_funcionamento: data.horario_funcionamento,
+    status: 'pending',
+  }
+
   const { data: result, error } = await supabase
     .from('pending_tenants')
-    .insert(data)
+    .insert(payload)
     .select()
     .single()
+
   if (error) return { data: null, error }
 
   await supabase.functions
