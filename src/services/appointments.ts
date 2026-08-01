@@ -91,3 +91,35 @@ export async function updateAppointmentStatus(id: string, status: string) {
     .single()
   return { data: data as AppointmentWithRelations | null, error }
 }
+
+export async function updateAppointment(
+  id: string,
+  updates: {
+    barber_name?: string | null
+    service_id?: string
+    start_time?: string
+    end_time?: string
+  },
+) {
+  const { data: result, error } = await db
+    .from('appointments')
+    .update(updates)
+    .eq('id', id)
+    .select(
+      '*, customer:customers(id, name, phone), service:services(id, name, price, duration_minutes)',
+    )
+    .single()
+  return { data: result as AppointmentWithRelations | null, error }
+}
+
+export async function cancelAppointment(id: string, notify: boolean) {
+  const { data, error } = await updateAppointmentStatus(id, 'cancelled')
+  if (notify && data) {
+    db.functions
+      .invoke('send-appointment-notification', {
+        body: { appointment_id: id, type: 'cancellation' },
+      })
+      .catch(() => {})
+  }
+  return { data, error }
+}

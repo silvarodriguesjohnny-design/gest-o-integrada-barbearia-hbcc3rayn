@@ -19,7 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Clock, Plus, Share2, User, Loader2, MessageCircle } from 'lucide-react'
+import { Clock, Plus, Share2, User, Loader2, MessageCircle, Pencil } from 'lucide-react'
+import { EditAppointmentDialog } from '@/components/agenda/EditAppointmentDialog'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
 import { Badge } from '@/components/ui/badge'
@@ -34,6 +35,9 @@ export default function Agenda() {
   const [barbers, setBarbers] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedBarber, setSelectedBarber] = useState('all')
+  const [editingAppt, setEditingAppt] = useState<AppointmentWithRelations | null>(null)
+  const [editOpen, setEditOpen] = useState(false)
+  const [allServices, setAllServices] = useState<Service[]>([])
   const { toast } = useToast()
   const { tenant } = useAuth()
 
@@ -49,6 +53,9 @@ export default function Agenda() {
   useEffect(() => {
     getUniqueBarbers().then(({ data }) => {
       if (data) setBarbers(data)
+    })
+    getServices().then(({ data }) => {
+      if (data) setAllServices(data)
     })
   }, [])
 
@@ -178,7 +185,7 @@ export default function Agenda() {
                         </p>
                         <p className="font-medium">{app.barber_name || '-'}</p>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right flex items-center justify-end gap-1">
                         <Badge
                           variant={app.status === 'completed' ? 'secondary' : 'default'}
                           className={
@@ -189,6 +196,19 @@ export default function Agenda() {
                         >
                           {app.status}
                         </Badge>
+                        {app.status !== 'cancelled' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => {
+                              setEditingAppt(app)
+                              setEditOpen(true)
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -198,6 +218,14 @@ export default function Agenda() {
           </CardContent>
         </Card>
       </div>
+      <EditAppointmentDialog
+        appointment={editingAppt}
+        barbers={barbers}
+        services={allServices}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onUpdated={() => date && load(date)}
+      />
     </div>
   )
 }

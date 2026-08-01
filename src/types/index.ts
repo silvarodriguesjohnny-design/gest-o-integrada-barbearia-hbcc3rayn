@@ -34,6 +34,8 @@ export interface Customer {
   created_at: string
   last_visit_at: string | null
   discount_percentage?: number | null
+  cpf?: string | null
+  communication_preferences?: string[] | null
 }
 
 export interface CustomerWithDetails extends Customer {
@@ -47,6 +49,15 @@ export interface Service {
   description: string | null
   price: number
   duration_minutes: number
+}
+
+export interface Product {
+  id: string
+  name: string
+  description: string | null
+  price: number
+  tenant_id: string | null
+  created_at: string
 }
 
 export type AppointmentStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled'
@@ -110,6 +121,8 @@ export interface Partner {
 
 export interface DashboardMetrics {
   totalRevenue: number
+  serviceRevenue: number
+  productRevenue: number
   ticketMedio: number
   vipCount: number
   inactiveCount: number

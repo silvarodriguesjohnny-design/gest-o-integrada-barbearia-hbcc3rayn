@@ -11,6 +11,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Building2, Crown, TrendingUp, Users, Loader2, Clock } from 'lucide-react'
 import { getAllTenants, calculateMRR } from '@/services/super-admin'
+import { ManualTenantDialog } from '@/components/admin/ManualTenantDialog'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 
@@ -31,13 +32,17 @@ export default function SuperAdmin() {
   const [tenants, setTenants] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const load = () => {
     getAllTenants().then(({ data, error }) => {
       if (error) toast({ title: 'Erro', description: error.message, variant: 'destructive' })
       else setTenants(data || [])
       setLoading(false)
     })
-  }, [toast])
+  }
+
+  useEffect(() => {
+    load()
+  }, [])
 
   const totalMRR = calculateMRR(tenants)
   const activeCount = tenants.filter((t) => t.subscription_type === 'active').length
@@ -55,13 +60,16 @@ export default function SuperAdmin() {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-          <Crown className="h-8 w-8 text-accent" /> Painel Financeiro
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Visão geral de todas as barbearias na plataforma.
-        </p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+            <Crown className="h-8 w-8 text-accent" /> Painel Financeiro
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Visão geral de todas as barbearias na plataforma.
+          </p>
+        </div>
+        <ManualTenantDialog onCreated={load} />
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

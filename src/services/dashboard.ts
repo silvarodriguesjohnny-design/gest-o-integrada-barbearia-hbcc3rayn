@@ -38,6 +38,12 @@ export async function getDashboardMetrics(): Promise<{
     .filter((t: any) => t.type === 'expense')
     .reduce((s: number, t: any) => s + Number(t.amount), 0)
   const totalRevenue = income - expense
+  const serviceRevenue = transactions
+    .filter((t: any) => t.type === 'income' && t.category === 'servico')
+    .reduce((s: number, t: any) => s + Number(t.amount), 0)
+  const productRevenue = transactions
+    .filter((t: any) => t.type === 'income' && t.category === 'produto')
+    .reduce((s: number, t: any) => s + Number(t.amount), 0)
 
   const completedAppts = appointments.filter((a: any) => a.status === 'completed')
   const ticketMedio = completedAppts.length > 0 ? income / completedAppts.length : 0
@@ -69,6 +75,8 @@ export async function getDashboardMetrics(): Promise<{
 
   const metrics: DashboardMetrics = {
     totalRevenue,
+    serviceRevenue,
+    productRevenue,
     ticketMedio,
     vipCount,
     inactiveCount,

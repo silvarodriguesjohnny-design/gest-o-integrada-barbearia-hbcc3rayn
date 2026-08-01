@@ -30,25 +30,31 @@ import {
 } from 'lucide-react'
 import { getTransactions, createTransaction } from '@/services/transactions'
 import { getServices } from '@/services/catalog'
+import { getProducts } from '@/services/products'
 import { getCustomers } from '@/services/customers'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
-import type { Transaction, Service, CustomerWithDetails } from '@/types'
+import { Badge } from '@/components/ui/badge'
+import type { Transaction, Service, CustomerWithDetails, Product } from '@/types'
 
 interface CartItem {
-  service: Service
+  name: string
+  price: number
+  type: 'service' | 'product'
 }
 
 export default function Financeiro() {
   const { toast } = useToast()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [services, setServices] = useState<Service[]>([])
+  const [products, setProducts] = useState<Product[]>([])
   const [customers, setCustomers] = useState<CustomerWithDetails[]>([])
   const [loading, setLoading] = useState(true)
   const [cart, setCart] = useState<CartItem[]>([])
   const [customerId, setCustomerId] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('pix')
   const [selectedService, setSelectedService] = useState('')
+  const [selectedProduct, setSelectedProduct] = useState('')
   const [checkingOut, setCheckingOut] = useState(false)
 
   const load = () => {
@@ -63,20 +69,29 @@ export default function Financeiro() {
   useEffect(() => {
     load()
     getServices().then(({ data }) => data && setServices(data))
+    getProducts().then(({ data }) => data && setProducts(data))
     getCustomers().then(({ data }) => data && setCustomers(data))
   }, [])
 
-  const addToCart = () => {
-    const svc = services.find((s) => s.id === selectedService)
-    if (svc) {
-      setCart([...cart, { service: svc }])
-      setSelectedService('')
+  const addToCart = (type: 'service' | 'product') => {
+    if (type === 'service') {
+      const svc = services.find((s) => s.id === selectedService)
+      if (svc) {
+        setCart([...cart, { name: svc.name, price: Number(svc.price), type: 'service' }])
+        setSelectedService('')
+      }
+    } else {
+      const prod = products.find((p) => p.id === selectedProduct)
+      if (prod) {
+        setCart([...cart, { name: prod.name, price: Number(prod.price), type: 'product' }])
+        setSelectedProduct('')
+      }
     }
   }
 
   const removeFromCart = (idx: number) => setCart(cart.filter((_, i) => i !== idx))
 
-  const total = cart.reduce((s, item) => s + Number(item.service.price), 0)
+  const total = cart.reduce((s, item) => s + item.price, 0)
 
   const handleCheckout = async () => {
     if (cart.length === 0) {
@@ -87,9 +102,9 @@ export default function Financeiro() {
     for (const item of cart) {
       const { error } = await createTransaction({
         type: 'income',
-        amount: Number(item.service.price),
-        description: `Serviço: ${item.service.name}`,
-        category: 'servico',
+        amount: item.price,
+        description: item.type === 'service' ? `Serviço: ${item.name}` : `Produto: ${item.name}`,
+        category: item.type === 'service' ? 'servico' : 'produto',
         payment_method: paymentMethod,
         customer_id: customerId || null,
       })
@@ -166,7 +181,35 @@ export default function Financeiro() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <Button variant="secondary" onClick={addToCart} disabled={!selectedService}>
+                    <Button
+                      variant="secondary"
+                      onClick={() => addToCart('service')}
+                      disabled={!selectedService}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-semibold">Adicionar Produto</Label>
+                  <div className="flex gap-2">
+                    <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Selecione" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {products.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.name} (R$ {p.price})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="secondary"
+                      onClick={() => addToCart('product')}
+                      disabled={!selectedProduct}
+                    >
                       <Plus className="h-4 w-4" />
                     </Button>
                   </div>
@@ -178,12 +221,16 @@ export default function Financeiro() {
                     cart.map((item, i) => (
                       <div key={i} className="flex justify-between items-center text-sm">
                         <span className="font-medium flex items-center gap-2">
-                          {item.service.name}
+                          <Badge
+                            variant={item.type === 'service' ? 'default' : 'secondary'}
+                            className="text-xs"
+                          >
+                            {item.type === 'service' ? 'Serviço' : 'Produto'}
+                          </Badge>
+                          {item.name}
                         </span>
                         <span className="flex items-center gap-2">
-                          <span className="font-semibold text-primary">
-                            {fmt(Number(item.service.price))}
-                          </span>
+                          <span className="font-semibold text-primary">{fmt(item.price)}</span>
                           <Button
                             variant="ghost"
                             size="icon"

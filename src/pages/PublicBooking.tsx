@@ -4,14 +4,17 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Scissors, Clock, Loader2, CheckCircle2, Calendar } from 'lucide-react'
+import { Scissors, Clock, Loader2, CheckCircle2, Calendar, User } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { ClientIdentification } from '@/components/public/ClientIdentification'
 import {
   getTenantData,
   getSlots,
   createBooking,
-  calculateAvailableSlots,
+  calculateAvailableSlotsForBarber,
+  groupSlotsByPeriod,
   type PublicService,
+  type PublicCustomer,
 } from '@/services/public-booking'
 import { cn } from '@/lib/utils'
 
@@ -21,23 +24,21 @@ export default function PublicBooking() {
   const [tenant, setTenant] = useState<any>(null)
   const [services, setServices] = useState<PublicService[]>([])
   const [loading, setLoading] = useState(true)
+  const [customer, setCustomer] = useState<PublicCustomer | null>(null)
   const [selectedService, setSelectedService] = useState<PublicService | null>(null)
+  const [barbers, setBarbers] = useState<string[]>([])
+  const [selectedBarber, setSelectedBarber] = useState<string | null>(null)
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
-  const [slots, setSlots] = useState<string[]>([])
+  const [appointments, setAppointments] = useState<any[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [selectedSlot, setSelectedSlot] = useState('')
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
   const [booking, setBooking] = useState(false)
   const [done, setDone] = useState(false)
 
   useEffect(() => {
     if (!tenantId) return
-    getTenantData(tenantId).then(({ data, error }) => {
-      if (error || !data) {
-        toast({ title: 'Erro', description: 'Barbearia não encontrada.', variant: 'destructive' })
-      } else {
+    getTenantData(tenantId).then(({ data }) => {
+      if (data) {
         setTenant(data.tenant)
         setServices(data.services)
       }
@@ -51,25 +52,21 @@ export default function PublicBooking() {
     setSelectedSlot('')
     getSlots(tenantId, date).then(({ data }) => {
       if (data) {
-        const duration = selectedService?.duration_minutes || 30
-        setSlots(calculateAvailableSlots(data.appointments, duration, new Date(date)))
+        setAppointments(data.appointments || [])
+        setBarbers(data.barbers || [])
       }
       setLoadingSlots(false)
     })
-  }, [tenantId, date, selectedService])
+  }, [tenantId, date])
 
   const handleBook = async () => {
-    if (!tenantId || !selectedService || !selectedSlot || !name || !phone) {
-      toast({ title: 'Preencha todos os campos', variant: 'destructive' })
-      return
-    }
+    if (!tenantId || !selectedService || !selectedSlot || !customer) return
     setBooking(true)
     const { error } = await createBooking({
       tenant_id: tenantId,
       service_id: selectedService.id,
-      customer_name: name,
-      customer_phone: phone,
-      customer_email: email,
+      customer_id: customer.id,
+      barber_name: selectedBarber,
       date,
       time: selectedSlot,
     })
@@ -99,7 +96,7 @@ export default function PublicBooking() {
       <div className="flex flex-col items-center justify-center min-h-screen bg-background p-6 text-center">
         <CheckCircle2 className="h-16 w-16 text-emerald-500 mb-4" />
         <h1 className="text-2xl font-bold">Agendamento Confirmado!</h1>
-        <p className="text-muted-foreground mt-2">{name}, seu horário foi reservado.</p>
+        <p className="text-muted-foreground mt-2">{customer?.name}, seu horário foi reservado.</p>
         <Button
           className="mt-6"
           onClick={() => {
@@ -113,6 +110,15 @@ export default function PublicBooking() {
       </div>
     )
   }
+
+  const slots = selectedService
+    ? calculateAvailableSlotsForBarber(
+        appointments,
+        selectedBarber,
+        selectedService.duration_minutes,
+        new Date(date),
+      )
+    : []
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
@@ -135,8 +141,14 @@ export default function PublicBooking() {
           </div>
         </div>
 
-        {!selectedService ? (
+        {!customer ? (
+          <ClientIdentification tenantId={tenantId!} onIdentified={setCustomer} />
+        ) : !selectedService ? (
           <div className="grid gap-3">
+            <div className="flex items-center gap-2">
+              <User className="h-5 w-5 text-accent" />
+              <span className="font-semibold">Olá, {customer.name}!</span>
+            </div>
             <h2 className="text-lg font-semibold">Escolha um serviço</h2>
             {services.map((s) => (
               <Card
@@ -169,6 +181,34 @@ export default function PublicBooking() {
                 Trocar
               </Button>
             </div>
+
+            {barbers.length > 0 && (
+              <div className="space-y-2">
+                <Label>Profissional</Label>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant={selectedBarber === null ? 'default' : 'outline'}
+                    size="sm"
+                    className={cn(selectedBarber === null && 'bg-accent text-white')}
+                    onClick={() => setSelectedBarber(null)}
+                  >
+                    Qualquer
+                  </Button>
+                  {barbers.map((b) => (
+                    <Button
+                      key={b}
+                      variant={selectedBarber === b ? 'default' : 'outline'}
+                      size="sm"
+                      className={cn(selectedBarber === b && 'bg-accent text-white')}
+                      onClick={() => setSelectedBarber(b)}
+                    >
+                      {b}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" /> Data
@@ -180,6 +220,7 @@ export default function PublicBooking() {
                 onChange={(e) => setDate(e.target.value)}
               />
             </div>
+
             {loadingSlots ? (
               <div className="flex justify-center py-4">
                 <Loader2 className="h-6 w-6 animate-spin text-accent" />
@@ -187,55 +228,36 @@ export default function PublicBooking() {
             ) : slots.length === 0 ? (
               <p className="text-center text-muted-foreground py-4">Nenhum horário disponível.</p>
             ) : (
-              <div className="grid grid-cols-4 gap-2">
-                {slots.map((slot) => (
-                  <Button
-                    key={slot}
-                    variant={selectedSlot === slot ? 'default' : 'outline'}
-                    size="sm"
-                    className={cn(selectedSlot === slot && 'bg-accent text-white')}
-                    onClick={() => setSelectedSlot(slot)}
-                  >
-                    {slot}
-                  </Button>
-                ))}
-              </div>
+              groupSlotsByPeriod(slots).map((group) => (
+                <div key={group.period} className="space-y-2">
+                  <p className="text-sm font-semibold text-muted-foreground">
+                    {group.period} <span className="text-xs">({group.slots.length} horários)</span>
+                  </p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {group.slots.map((slot) => (
+                      <Button
+                        key={slot}
+                        variant={selectedSlot === slot ? 'default' : 'outline'}
+                        size="sm"
+                        className={cn(selectedSlot === slot && 'bg-accent text-white')}
+                        onClick={() => setSelectedSlot(slot)}
+                      >
+                        {slot}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              ))
             )}
+
             {selectedSlot && (
-              <div className="space-y-3 pt-2">
-                <div className="space-y-2">
-                  <Label>Nome</Label>
-                  <Input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Seu nome"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Telefone</Label>
-                  <Input
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="(11) 98765-4321"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Email (opcional)</Label>
-                  <Input
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="seu@email.com"
-                  />
-                </div>
-                <Button
-                  className="w-full bg-accent hover:bg-accent/90 text-white"
-                  disabled={booking}
-                  onClick={handleBook}
-                >
-                  {booking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Confirmar
-                  Agendamento
-                </Button>
-              </div>
+              <Button
+                className="w-full bg-accent hover:bg-accent/90 text-white"
+                disabled={booking}
+                onClick={handleBook}
+              >
+                {booking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Confirmar Agendamento
+              </Button>
             )}
           </div>
         )}
