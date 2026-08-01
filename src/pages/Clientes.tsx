@@ -45,6 +45,7 @@ export default function Clientes() {
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [showPendingDialog, setShowPendingDialog] = useState(false)
   const [pendingRefresh, setPendingRefresh] = useState(0)
+  const [activeFilter, setActiveFilter] = useState<'all' | 'vip' | 'active' | 'inactive'>('all')
   const { toast } = useToast()
   const { isSuperAdmin } = useAuth()
 
@@ -69,7 +70,19 @@ export default function Clientes() {
     return 'bg-red-500'
   }
 
-  const filtered = customers.filter((c) => c.name.toLowerCase().includes(searchTerm.toLowerCase()))
+  const filtered = customers.filter((c) => {
+    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase())
+    if (!matchesSearch) return false
+    if (activeFilter === 'all') return true
+    const stamps = c.loyalty_card?.stamps_count ?? 0
+    const days = c.last_visit_at
+      ? Math.floor((Date.now() - new Date(c.last_visit_at).getTime()) / 86400000)
+      : 999
+    if (activeFilter === 'vip') return stamps >= 10
+    if (activeFilter === 'active') return days <= 30
+    if (activeFilter === 'inactive') return days > 60
+    return true
+  })
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -88,9 +101,26 @@ export default function Clientes() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="outline">
-            <Filter className="h-4 w-4 mr-2" /> Filtros
-          </Button>
+          <div className="flex gap-1">
+            {(
+              [
+                { key: 'all', label: 'Todos' },
+                { key: 'vip', label: 'VIP' },
+                { key: 'active', label: 'Ativos' },
+                { key: 'inactive', label: 'Inativos' },
+              ] as const
+            ).map((f) => (
+              <Button
+                key={f.key}
+                variant={activeFilter === f.key ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setActiveFilter(f.key)}
+                className={activeFilter === f.key ? 'bg-accent text-white' : ''}
+              >
+                {f.label}
+              </Button>
+            ))}
+          </div>
           <Button
             className="bg-accent hover:bg-accent/90 text-white"
             onClick={() => (isSuperAdmin ? setShowPendingDialog(true) : setShowAddDialog(true))}

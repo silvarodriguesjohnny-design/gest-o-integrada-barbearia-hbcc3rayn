@@ -105,6 +105,8 @@ export type Database = {
       customers: {
         Row: {
           birthday: string | null
+          communication_preferences: Json | null
+          cpf: string | null
           created_at: string
           discount_percentage: number | null
           email: string | null
@@ -116,6 +118,8 @@ export type Database = {
         }
         Insert: {
           birthday?: string | null
+          communication_preferences?: Json | null
+          cpf?: string | null
           created_at?: string
           discount_percentage?: number | null
           email?: string | null
@@ -127,6 +131,8 @@ export type Database = {
         }
         Update: {
           birthday?: string | null
+          communication_preferences?: Json | null
+          cpf?: string | null
           created_at?: string
           discount_percentage?: number | null
           email?: string | null
@@ -413,6 +419,33 @@ export type Database = {
         }
         Relationships: []
       }
+      products: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          price: number | null
+          tenant_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          price?: number | null
+          tenant_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          price?: number | null
+          tenant_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -489,12 +522,26 @@ export type Database = {
       }
       tenants: {
         Row: {
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
+          complemento: string | null
+          cpf_cnpj: string | null
           created_at: string
+          email: string | null
+          estado: string | null
+          full_name: string | null
+          horario_funcionamento: string | null
           id: string
           logo_url: string | null
           name: string
+          numero: string | null
+          numero_cadeiras: number | null
           owner_id: string | null
+          phone: string | null
           plan_type: Database['public']['Enums']['plan_type']
+          quantidade_profissionais: number | null
+          rua: string | null
           slug: string
           status: string
           subscription_status: string
@@ -503,12 +550,26 @@ export type Database = {
           whatsapp_phone: string | null
         }
         Insert: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          complemento?: string | null
+          cpf_cnpj?: string | null
           created_at?: string
+          email?: string | null
+          estado?: string | null
+          full_name?: string | null
+          horario_funcionamento?: string | null
           id?: string
           logo_url?: string | null
           name: string
+          numero?: string | null
+          numero_cadeiras?: number | null
           owner_id?: string | null
+          phone?: string | null
           plan_type?: Database['public']['Enums']['plan_type']
+          quantidade_profissionais?: number | null
+          rua?: string | null
           slug: string
           status?: string
           subscription_status?: string
@@ -517,12 +578,26 @@ export type Database = {
           whatsapp_phone?: string | null
         }
         Update: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          complemento?: string | null
+          cpf_cnpj?: string | null
           created_at?: string
+          email?: string | null
+          estado?: string | null
+          full_name?: string | null
+          horario_funcionamento?: string | null
           id?: string
           logo_url?: string | null
           name?: string
+          numero?: string | null
+          numero_cadeiras?: number | null
           owner_id?: string | null
+          phone?: string | null
           plan_type?: Database['public']['Enums']['plan_type']
+          quantidade_profissionais?: number | null
+          rua?: string | null
           slug?: string
           status?: string
           subscription_status?: string

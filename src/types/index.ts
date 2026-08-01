@@ -23,6 +23,20 @@ export interface Tenant {
   whatsapp_phone: string | null
   owner_id: string
   created_at: string
+  full_name?: string | null
+  email?: string | null
+  phone?: string | null
+  cpf_cnpj?: string | null
+  cep?: string | null
+  rua?: string | null
+  numero?: string | null
+  complemento?: string | null
+  bairro?: string | null
+  cidade?: string | null
+  estado?: string | null
+  horario_funcionamento?: string | null
+  numero_cadeiras?: number | null
+  quantidade_profissionais?: number | null
 }
 
 export interface Customer {

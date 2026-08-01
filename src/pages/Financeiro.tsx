@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -20,6 +21,7 @@ import {
 } from '@/components/ui/table'
 import {
   Download,
+  FileSpreadsheet,
   ShoppingCart,
   ArrowDownToLine,
   ArrowUpToLine,
@@ -27,14 +29,21 @@ import {
   Loader2,
   Trash2,
   Plus,
+  Filter,
+  X,
 } from 'lucide-react'
 import { getTransactions, createTransaction } from '@/services/transactions'
 import { getServices } from '@/services/catalog'
 import { getProducts } from '@/services/products'
 import { getCustomers } from '@/services/customers'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { generateFinanceiroPDF } from '@/lib/pdf-report'
+import { generateFinanceiroExcel } from '@/lib/excel-export'
+import { AddServiceDialog } from '@/components/financeiro/AddServiceDialog'
+import { AddProductDialog } from '@/components/financeiro/AddProductDialog'
 import type { Transaction, Service, CustomerWithDetails, Product } from '@/types'
 
 interface CartItem {
@@ -45,6 +54,7 @@ interface CartItem {
 
 export default function Financeiro() {
   const { toast } = useToast()
+  const { tenant } = useAuth()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [services, setServices] = useState<Service[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -56,8 +66,17 @@ export default function Financeiro() {
   const [selectedService, setSelectedService] = useState('')
   const [selectedProduct, setSelectedProduct] = useState('')
   const [checkingOut, setCheckingOut] = useState(false)
+  const [exportingExcel, setExportingExcel] = useState(false)
+  const [showAddService, setShowAddService] = useState(false)
+  const [showAddProduct, setShowAddProduct] = useState(false)
 
-  const load = () => {
+  const [fType, setFType] = useState('all')
+  const [fCategory, setFCategory] = useState('all')
+  const [fPayment, setFPayment] = useState('all')
+  const [fDateFrom, setFDateFrom] = useState('')
+  const [fDateTo, setFDateTo] = useState('')
+
+  const loadAll = () => {
     setLoading(true)
     getTransactions().then(({ data, error }) => {
       if (error) toast({ title: 'Erro', description: error.message, variant: 'destructive' })
@@ -66,10 +85,13 @@ export default function Financeiro() {
     })
   }
 
+  const loadServices = () => getServices().then(({ data }) => data && setServices(data))
+  const loadProducts = () => getProducts().then(({ data }) => data && setProducts(data))
+
   useEffect(() => {
-    load()
-    getServices().then(({ data }) => data && setServices(data))
-    getProducts().then(({ data }) => data && setProducts(data))
+    loadAll()
+    loadServices()
+    loadProducts()
     getCustomers().then(({ data }) => data && setCustomers(data))
   }, [])
 
@@ -89,9 +111,8 @@ export default function Financeiro() {
     }
   }
 
-  const removeFromCart = (idx: number) => setCart(cart.filter((_, i) => i !== idx))
-
-  const total = cart.reduce((s, item) => s + item.price, 0)
+  const total = cart.reduce((s, i) => s + i.price, 0)
+  const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
   const handleCheckout = async () => {
     if (cart.length === 0) {
@@ -118,10 +139,67 @@ export default function Financeiro() {
     setCart([])
     setCustomerId('')
     toast({ title: 'Venda finalizada!', description: 'Transações registradas com sucesso.' })
-    load()
+    loadAll()
   }
 
-  const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  const clearFilters = () => {
+    setFType('all')
+    setFCategory('all')
+    setFPayment('all')
+    setFDateFrom('')
+    setFDateTo('')
+  }
+
+  const hasFilters =
+    fType !== 'all' || fCategory !== 'all' || fPayment !== 'all' || fDateFrom || fDateTo
+
+  const filteredTx = transactions.filter((t) => {
+    if (fType !== 'all' && t.type !== fType) return false
+    if (fCategory !== 'all') {
+      if (fCategory === 'service' && t.category !== 'servico') return false
+      if (fCategory === 'product' && t.category !== 'produto') return false
+    }
+    if (fPayment !== 'all' && t.payment_method !== fPayment) return false
+    if (fDateFrom && new Date(t.created_at) < new Date(fDateFrom)) return false
+    if (fDateTo) {
+      const eod = new Date(fDateTo)
+      eod.setHours(23, 59, 59, 999)
+      if (new Date(t.created_at) > eod) return false
+    }
+    return true
+  })
+
+  const tIncome = filteredTx
+    .filter((t) => t.type === 'income')
+    .reduce((s, t) => s + Number(t.amount), 0)
+  const tExpense = filteredTx
+    .filter((t) => t.type === 'expense')
+    .reduce((s, t) => s + Number(t.amount), 0)
+  const tBalance = tIncome - tExpense
+
+  const handlePDF = () => {
+    generateFinanceiroPDF(
+      filteredTx,
+      { income: tIncome, expense: tExpense, balance: tBalance },
+      tenant?.name || 'Barbearia',
+    )
+  }
+
+  const handleExcelExport = () => {
+    setExportingExcel(true)
+    try {
+      const customerMap = new Map(customers.map((c) => [c.id, c.name]))
+      generateFinanceiroExcel(
+        filteredTx,
+        { income: tIncome, expense: tExpense, balance: tBalance },
+        tenant?.name || 'Barbearia',
+        customerMap,
+      )
+    } catch {
+      toast({ title: 'Erro', description: 'Falha ao gerar Excel.', variant: 'destructive' })
+    }
+    setTimeout(() => setExportingExcel(false), 600)
+  }
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -142,6 +220,14 @@ export default function Financeiro() {
         </TabsList>
 
         <TabsContent value="pdv" className="mt-6">
+          <div className="flex gap-2 mb-4">
+            <Button variant="outline" size="sm" onClick={() => setShowAddService(true)}>
+              <Plus className="h-4 w-4 mr-2" /> Novo Serviço
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowAddProduct(true)}>
+              <Plus className="h-4 w-4 mr-2" /> Novo Produto
+            </Button>
+          </div>
           <div className="grid md:grid-cols-2 gap-6">
             <Card className="hover:shadow-elevation transition-shadow">
               <CardHeader className="bg-muted/20 border-b pb-4">
@@ -235,7 +321,7 @@ export default function Financeiro() {
                             variant="ghost"
                             size="icon"
                             className="h-6 w-6"
-                            onClick={() => removeFromCart(i)}
+                            onClick={() => setCart(cart.filter((_, idx) => idx !== i))}
                           >
                             <Trash2 className="h-3 w-3" />
                           </Button>
@@ -295,21 +381,136 @@ export default function Financeiro() {
         </TabsContent>
 
         <TabsContent value="fluxo" className="mt-6">
+          <Card className="hover:shadow-elevation transition-shadow mb-4">
+            <CardHeader className="bg-muted/20 border-b pb-4">
+              <CardTitle className="flex items-center gap-2 font-serif text-xl">
+                <Filter className="h-5 w-5 text-accent" /> Filtros
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="flex flex-wrap gap-3 items-end">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Tipo</Label>
+                  <Select value={fType} onValueChange={setFType}>
+                    <SelectTrigger className="w-[130px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="income">Receitas</SelectItem>
+                      <SelectItem value="expense">Despesas</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Categoria</Label>
+                  <Select value={fCategory} onValueChange={setFCategory}>
+                    <SelectTrigger className="w-[140px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas</SelectItem>
+                      <SelectItem value="service">Serviços</SelectItem>
+                      <SelectItem value="product">Produtos</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Pagamento</Label>
+                  <Select value={fPayment} onValueChange={setFPayment}>
+                    <SelectTrigger className="w-[150px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos</SelectItem>
+                      <SelectItem value="pix">PIX</SelectItem>
+                      <SelectItem value="cc">Crédito</SelectItem>
+                      <SelectItem value="cd">Débito</SelectItem>
+                      <SelectItem value="money">Dinheiro</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">De</Label>
+                  <Input
+                    type="date"
+                    value={fDateFrom}
+                    onChange={(e) => setFDateFrom(e.target.value)}
+                    className="w-[150px]"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Até</Label>
+                  <Input
+                    type="date"
+                    value={fDateTo}
+                    onChange={(e) => setFDateTo(e.target.value)}
+                    className="w-[150px]"
+                  />
+                </div>
+                {hasFilters && (
+                  <Button variant="outline" size="sm" onClick={clearFilters}>
+                    <X className="h-4 w-4 mr-1" /> Limpar
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-3 gap-4 mb-4">
+            <Card className="hover:shadow-elevation transition-shadow">
+              <CardContent className="pt-6">
+                <p className="text-xs text-muted-foreground uppercase font-semibold">Receitas</p>
+                <p className="text-2xl font-bold text-emerald-600">{fmt(tIncome)}</p>
+              </CardContent>
+            </Card>
+            <Card className="hover:shadow-elevation transition-shadow">
+              <CardContent className="pt-6">
+                <p className="text-xs text-muted-foreground uppercase font-semibold">Despesas</p>
+                <p className="text-2xl font-bold text-destructive">{fmt(tExpense)}</p>
+              </CardContent>
+            </Card>
+            <Card className="hover:shadow-elevation transition-shadow">
+              <CardContent className="pt-6">
+                <p className="text-xs text-muted-foreground uppercase font-semibold">Saldo</p>
+                <p
+                  className={cn(
+                    'text-2xl font-bold',
+                    tBalance >= 0 ? 'text-emerald-600' : 'text-destructive',
+                  )}
+                >
+                  {fmt(tBalance)}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
           <Card className="hover:shadow-elevation transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between border-b bg-muted/20 pb-4">
               <div>
                 <CardTitle className="font-serif text-xl">Histórico de Transações</CardTitle>
-                <CardDescription>Entradas e saídas registradas.</CardDescription>
+                <CardDescription>
+                  {filteredTx.length} de {transactions.length} registro(s)
+                </CardDescription>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  toast({ title: 'Exportação', description: 'Gerando relatório PDF...' })
-                }
-              >
-                <Download className="h-4 w-4 mr-2" /> Exportar PDF
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handlePDF}>
+                  <Download className="h-4 w-4 mr-2" /> Gerar Relatório em PDF
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExcelExport}
+                  disabled={exportingExcel}
+                >
+                  {exportingExcel ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  )}
+                  Gerar Relatório em Excel
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <Table>
@@ -328,8 +529,14 @@ export default function Financeiro() {
                         <Loader2 className="h-6 w-6 animate-spin mx-auto text-accent" />
                       </TableCell>
                     </TableRow>
+                  ) : filteredTx.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                        Nenhuma transação encontrada.
+                      </TableCell>
+                    </TableRow>
                   ) : (
-                    transactions.map((t) => (
+                    filteredTx.map((t) => (
                       <TableRow key={t.id} className="hover:bg-muted/30">
                         <TableCell className="pl-6 font-medium">
                           {new Date(t.created_at).toLocaleString('pt-BR')}
@@ -360,6 +567,17 @@ export default function Financeiro() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <AddServiceDialog
+        open={showAddService}
+        onOpenChange={setShowAddService}
+        onCreated={loadServices}
+      />
+      <AddProductDialog
+        open={showAddProduct}
+        onOpenChange={setShowAddProduct}
+        onCreated={loadProducts}
+      />
     </div>
   )
 }

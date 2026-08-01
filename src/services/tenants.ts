@@ -33,7 +33,26 @@ export async function createTenant(data: {
 
 export async function updateTenant(
   id: string,
-  data: { name?: string; logo_url?: string; whatsapp_phone?: string },
+  data: {
+    name?: string
+    logo_url?: string
+    whatsapp_phone?: string
+    full_name?: string | null
+    email?: string | null
+    phone?: string | null
+    cpf_cnpj?: string | null
+    cep?: string | null
+    rua?: string | null
+    numero?: string | null
+    complemento?: string | null
+    bairro?: string | null
+    cidade?: string | null
+    estado?: string | null
+    horario_funcionamento?: string | null
+    numero_cadeiras?: number | null
+    quantidade_profissionais?: number | null
+    plan_type?: PlanType
+  },
 ): Promise<{ error: any }> {
   const { error } = await db.from('tenants').update(data).eq('id', id)
   return { error }

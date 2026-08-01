@@ -17,6 +17,7 @@ import {
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
 import { updateTenant, uploadLogo } from '@/services/tenants'
+import { CommunicationChannels } from '@/components/settings/CommunicationChannels'
 
 export default function Settings() {
   const { tenant, refreshAuth } = useAuth()

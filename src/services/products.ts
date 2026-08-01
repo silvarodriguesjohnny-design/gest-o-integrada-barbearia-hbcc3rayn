@@ -6,22 +6,11 @@ export async function getProducts(): Promise<{ data: Product[] | null; error: an
   return { data: data as Product[] | null, error }
 }
 
-export async function createProduct(data: Partial<Product>) {
+export async function createProduct(data: {
+  name: string
+  description?: string
+  price: number
+}): Promise<{ data: Product | null; error: any }> {
   const { data: result, error } = await db.from('products').insert(data).select('*').single()
   return { data: result as Product | null, error }
-}
-
-export async function updateProduct(id: string, data: Partial<Product>) {
-  const { data: result, error } = await db
-    .from('products')
-    .update(data)
-    .eq('id', id)
-    .select('*')
-    .single()
-  return { data: result as Product | null, error }
-}
-
-export async function deleteProduct(id: string) {
-  const { error } = await db.from('products').delete().eq('id', id)
-  return { error }
 }

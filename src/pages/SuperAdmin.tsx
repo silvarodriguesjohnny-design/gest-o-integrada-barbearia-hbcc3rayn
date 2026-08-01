@@ -14,6 +14,8 @@ import { getAllTenants, calculateMRR } from '@/services/super-admin'
 import { ManualTenantDialog } from '@/components/admin/ManualTenantDialog'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
+import { TenantEditDialog } from '@/components/admin/TenantEditDialog'
+import { Button } from '@/components/ui/button'
 
 const PLAN_LABELS: Record<string, string> = { essential: 'Essential', pro: 'Pro', elite: 'Elite' }
 const PLAN_COLORS: Record<string, string> = {
@@ -31,6 +33,7 @@ export default function SuperAdmin() {
   const { toast } = useToast()
   const [tenants, setTenants] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [editingTenant, setEditingTenant] = useState<any | null>(null)
 
   const load = () => {
     getAllTenants().then(({ data, error }) => {
@@ -132,12 +135,13 @@ export default function SuperAdmin() {
                 <TableHead>Expiração</TableHead>
                 <TableHead>Barbeiros</TableHead>
                 <TableHead className="text-right pr-6">MRR</TableHead>
+                <TableHead className="text-right pr-6">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {tenants.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     Nenhum tenant cadastrado ainda.
                   </TableCell>
                 </TableRow>
@@ -185,6 +189,16 @@ export default function SuperAdmin() {
                     <TableCell className="text-right pr-6 font-bold text-emerald-600">
                       {fmt(t.mrr || 0)}
                     </TableCell>
+                    <TableCell className="text-right pr-6">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="hover:bg-accent/10 hover:text-accent"
+                        onClick={() => setEditingTenant(t)}
+                      >
+                        Editar
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -192,6 +206,13 @@ export default function SuperAdmin() {
           </Table>
         </CardContent>
       </Card>
+
+      <TenantEditDialog
+        tenant={editingTenant}
+        open={!!editingTenant}
+        onOpenChange={(v) => !v && setEditingTenant(null)}
+        onSaved={load}
+      />
     </div>
   )
 }
