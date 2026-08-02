@@ -63,6 +63,27 @@ export type Database = {
           },
         ]
       }
+      barbers: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          tenant_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          tenant_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          tenant_id?: string | null
+        }
+        Relationships: []
+      }
       campaigns: {
         Row: {
           auto_trigger: boolean

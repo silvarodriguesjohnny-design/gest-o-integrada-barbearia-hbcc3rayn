@@ -7,7 +7,7 @@
     "send-email": 1,
     "test-messaging": 1,
     "send-appointment-notification": 1,
-    "public-booking": 4,
+    "public-booking": 5,
     "create-operator": 1,
     "approve-tenant": 2
   }

@@ -30,6 +30,11 @@ export interface SlotAppointment {
   barber_name: string | null
 }
 
+export interface TimeSlot {
+  time: string
+  available: boolean
+}
+
 export async function getTenantData(tenantId: string) {
   const { data, error } = await supabase.functions.invoke('public-booking', {
     body: { action: 'get_tenant', tenant_id: tenantId },
@@ -128,8 +133,53 @@ export function calculateAvailableSlotsForBarber(
   return calculateAvailableSlots(filtered, durationMinutes, date)
 }
 
-export function groupSlotsByPeriod(slots: string[]): { period: string; slots: string[] }[] {
-  const parse = (s: string) => parseInt(s.split(':')[0])
+export function calculateAllSlots(
+  appointments: SlotAppointment[],
+  durationMinutes: number,
+  date: Date,
+  startHour = 9,
+  endHour = 20,
+): TimeSlot[] {
+  const slots: TimeSlot[] = []
+  const dayStart = new Date(date)
+  dayStart.setHours(startHour, 0, 0, 0)
+  const dayEnd = new Date(date)
+  dayEnd.setHours(endHour, 0, 0, 0)
+
+  let current = new Date(dayStart)
+  while (current < dayEnd) {
+    const slotEnd = new Date(current.getTime() + durationMinutes * 60000)
+    if (slotEnd > dayEnd) break
+
+    const conflict = appointments.some((appt) => {
+      const apptStart = new Date(appt.start_time)
+      const apptEnd = new Date(appt.end_time)
+      return current < apptEnd && slotEnd > apptStart
+    })
+
+    slots.push({
+      time: current.toTimeString().slice(0, 5),
+      available: !conflict,
+    })
+    current = new Date(current.getTime() + 30 * 60000)
+  }
+  return slots
+}
+
+export function calculateAllSlotsForBarber(
+  appointments: SlotAppointment[],
+  barberName: string | null,
+  durationMinutes: number,
+  date: Date,
+): TimeSlot[] {
+  const filtered = barberName
+    ? appointments.filter((a) => a.barber_name === barberName)
+    : appointments
+  return calculateAllSlots(filtered, durationMinutes, date)
+}
+
+export function groupSlotsByPeriod(slots: TimeSlot[]): { period: string; slots: TimeSlot[] }[] {
+  const parse = (s: TimeSlot) => parseInt(s.time.split(':')[0])
   const groups = [
     { period: 'Manhã', slots: slots.filter((s) => parse(s) < 12) },
     { period: 'Tarde', slots: slots.filter((s) => parse(s) >= 12 && parse(s) < 18) },

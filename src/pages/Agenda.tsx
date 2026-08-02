@@ -27,6 +27,7 @@ import { Badge } from '@/components/ui/badge'
 import { getAppointmentsByDate, createAppointment, getUniqueBarbers } from '@/services/appointments'
 import { getCustomers } from '@/services/customers'
 import { getServices } from '@/services/catalog'
+import { supabase } from '@/lib/supabase/client'
 import type { AppointmentWithRelations, CustomerWithDetails, Service } from '@/types'
 
 export default function Agenda() {
@@ -61,6 +62,18 @@ export default function Agenda() {
 
   useEffect(() => {
     if (date) load(date)
+  }, [date])
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('appointments-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => {
+        if (date) load(date)
+      })
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [date])
 
   const bookingLink = `${window.location.origin}/booking/${tenant?.id || ''}`

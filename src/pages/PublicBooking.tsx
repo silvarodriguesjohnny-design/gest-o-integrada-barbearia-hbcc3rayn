@@ -11,7 +11,7 @@ import {
   getTenantData,
   getSlots,
   createBooking,
-  calculateAvailableSlotsForBarber,
+  calculateAllSlotsForBarber,
   groupSlotsByPeriod,
   type PublicService,
   type PublicCustomer,
@@ -57,6 +57,19 @@ export default function PublicBooking() {
       }
       setLoadingSlots(false)
     })
+  }, [tenantId, date])
+
+  useEffect(() => {
+    if (!tenantId || !date) return
+    const interval = setInterval(() => {
+      getSlots(tenantId, date).then(({ data }) => {
+        if (data) {
+          setAppointments(data.appointments || [])
+          setBarbers(data.barbers || [])
+        }
+      })
+    }, 15000)
+    return () => clearInterval(interval)
   }, [tenantId, date])
 
   const handleBook = async () => {
@@ -112,7 +125,7 @@ export default function PublicBooking() {
   }
 
   const slots = selectedService
-    ? calculateAvailableSlotsForBarber(
+    ? calculateAllSlotsForBarber(
         appointments,
         selectedBarber,
         selectedService.duration_minutes,
@@ -231,18 +244,25 @@ export default function PublicBooking() {
               groupSlotsByPeriod(slots).map((group) => (
                 <div key={group.period} className="space-y-2">
                   <p className="text-sm font-semibold text-muted-foreground">
-                    {group.period} <span className="text-xs">({group.slots.length} horários)</span>
+                    {group.period}{' '}
+                    <span className="text-xs">
+                      ({group.slots.filter((s) => s.available).length} disponíveis)
+                    </span>
                   </p>
                   <div className="grid grid-cols-4 gap-2">
                     {group.slots.map((slot) => (
                       <Button
-                        key={slot}
-                        variant={selectedSlot === slot ? 'default' : 'outline'}
+                        key={slot.time}
+                        variant={selectedSlot === slot.time ? 'default' : 'outline'}
                         size="sm"
-                        className={cn(selectedSlot === slot && 'bg-accent text-white')}
-                        onClick={() => setSelectedSlot(slot)}
+                        disabled={!slot.available}
+                        className={cn(
+                          selectedSlot === slot.time && 'bg-accent text-white',
+                          !slot.available && 'opacity-40 cursor-not-allowed line-through bg-muted',
+                        )}
+                        onClick={() => slot.available && setSelectedSlot(slot.time)}
                       >
-                        {slot}
+                        {slot.time}
                       </Button>
                     ))}
                   </div>
