@@ -4,17 +4,19 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Scissors, Clock, Loader2, CheckCircle2, Calendar, User } from 'lucide-react'
+import { Scissors, Clock, Loader2, CheckCircle2, Calendar, User, CalendarX } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { ClientIdentification } from '@/components/public/ClientIdentification'
 import {
   getTenantData,
   getSlots,
   createBooking,
-  calculateAllSlotsForBarber,
+  calculateSlotsWithSchedules,
   groupSlotsByPeriod,
   type PublicService,
   type PublicCustomer,
+  type PublicBarberSchedule,
+  type SlotAppointment,
 } from '@/services/public-booking'
 import { cn } from '@/lib/utils'
 
@@ -29,7 +31,8 @@ export default function PublicBooking() {
   const [barbers, setBarbers] = useState<string[]>([])
   const [selectedBarber, setSelectedBarber] = useState<string | null>(null)
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
-  const [appointments, setAppointments] = useState<any[]>([])
+  const [appointments, setAppointments] = useState<SlotAppointment[]>([])
+  const [barberSchedules, setBarberSchedules] = useState<PublicBarberSchedule[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
   const [selectedSlot, setSelectedSlot] = useState('')
   const [booking, setBooking] = useState(false)
@@ -54,6 +57,7 @@ export default function PublicBooking() {
       if (data) {
         setAppointments(data.appointments || [])
         setBarbers(data.barbers || [])
+        setBarberSchedules(data.barber_schedules || [])
       }
       setLoadingSlots(false)
     })
@@ -66,9 +70,10 @@ export default function PublicBooking() {
         if (data) {
           setAppointments(data.appointments || [])
           setBarbers(data.barbers || [])
+          setBarberSchedules(data.barber_schedules || [])
         }
       })
-    }, 15000)
+    }, 5000)
     return () => clearInterval(interval)
   }, [tenantId, date])
 
@@ -125,8 +130,9 @@ export default function PublicBooking() {
   }
 
   const slots = selectedService
-    ? calculateAllSlotsForBarber(
+    ? calculateSlotsWithSchedules(
         appointments,
+        barberSchedules,
         selectedBarber,
         selectedService.duration_minutes,
         new Date(date),
@@ -222,6 +228,15 @@ export default function PublicBooking() {
               </div>
             )}
 
+            {barbers.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <CalendarX className="h-10 w-10 text-muted-foreground mb-2" />
+                <p className="text-muted-foreground">
+                  Nenhum profissional disponível para agendamento online no momento.
+                </p>
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" /> Data
@@ -239,7 +254,9 @@ export default function PublicBooking() {
                 <Loader2 className="h-6 w-6 animate-spin text-accent" />
               </div>
             ) : slots.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">Nenhum horário disponível.</p>
+              <p className="text-center text-muted-foreground py-4">
+                Nenhum horário disponível para esta data.
+              </p>
             ) : (
               groupSlotsByPeriod(slots).map((group) => (
                 <div key={group.period} className="space-y-2">

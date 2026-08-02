@@ -28,3 +28,8 @@ export async function deleteBarber(id: string): Promise<{ error: any }> {
   const { error } = await db.from('barbers').delete().eq('id', id)
   return { error }
 }
+
+export async function toggleBarberActive(id: string, isActive: boolean): Promise<{ error: any }> {
+  const { error } = await db.from('barbers').update({ is_active: isActive }).eq('id', id)
+  return { error }
+}

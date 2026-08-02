@@ -49,18 +49,39 @@ Deno.serve(async (req: Request) => {
 
         const { data: barbersData } = await supabase
           .from('barbers')
-          .select('name')
+          .select('id, name, is_active')
           .eq('tenant_id', body.tenant_id)
 
-        const appointmentBarbers = (appointments || [])
-          .map((a: any) => a.barber_name)
-          .filter(Boolean)
-        const tableBarbers = (barbersData || []).map((b: any) => b.name)
-        const barbers = [...new Set([...tableBarbers, ...appointmentBarbers])]
+        const { data: schedulesData } = await supabase
+          .from('barber_schedules')
+          .select('barber_id, day_of_week, start_time, end_time')
+          .eq('tenant_id', body.tenant_id)
 
-        return new Response(JSON.stringify({ appointments: appointments || [], barbers }), {
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        })
+        const barberMap = new Map((barbersData || []).map((b: any) => [b.id, b.name]))
+        const barberSchedules = (schedulesData || [])
+          .map((s: any) => ({
+            barber_name: barberMap.get(s.barber_id) || null,
+            day_of_week: s.day_of_week,
+            start_time: s.start_time,
+            end_time: s.end_time,
+          }))
+          .filter((s: any) => s.barber_name !== null)
+
+        const activeBarberNames = new Set(
+          (barbersData || []).filter((b: any) => b.is_active !== false).map((b: any) => b.name),
+        )
+        const barbers = [...new Set(barberSchedules.map((s: any) => s.barber_name))].filter(
+          (name: string) => activeBarberNames.has(name),
+        )
+
+        return new Response(
+          JSON.stringify({
+            appointments: appointments || [],
+            barbers,
+            barber_schedules: barberSchedules,
+          }),
+          { headers: { 'Content-Type': 'application/json', ...corsHeaders } },
+        )
       }
 
       case 'identify_customer': {

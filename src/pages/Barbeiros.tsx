@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import {
   Table,
   TableBody,
@@ -22,17 +23,28 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Plus, Pencil, Trash2, Loader2, Scissors } from 'lucide-react'
-import { getBarbers, createBarber, updateBarber, deleteBarber } from '@/services/barbers'
+import { Plus, Pencil, Trash2, Loader2, Scissors, Clock, Power, ShieldAlert } from 'lucide-react'
+import {
+  getBarbers,
+  createBarber,
+  updateBarber,
+  deleteBarber,
+  toggleBarberActive,
+} from '@/services/barbers'
 import { useToast } from '@/hooks/use-toast'
+import { useAuth } from '@/hooks/use-auth'
+import { WorkingHoursDialog } from '@/components/barbeiros/WorkingHoursDialog'
 import type { Barber } from '@/types'
 
 export default function Barbeiros() {
+  const { profile, isSuperAdmin } = useAuth()
+  const isAdmin = profile?.role === 'admin' || isSuperAdmin
   const [barbers, setBarbers] = useState<Barber[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [editingBarber, setEditingBarber] = useState<Barber | null>(null)
   const [deletingBarber, setDeletingBarber] = useState<Barber | null>(null)
+  const [schedulingBarber, setSchedulingBarber] = useState<Barber | null>(null)
   const { toast } = useToast()
 
   const load = () => {
@@ -60,6 +72,32 @@ export default function Barbeiros() {
     }
   }
 
+  const handleToggleActive = async (barber: Barber) => {
+    const newValue = !barber.is_active
+    const { error } = await toggleBarberActive(barber.id, newValue)
+    if (error) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' })
+    } else {
+      toast({
+        title: newValue ? 'Barbeiro ativado!' : 'Barbeiro desativado!',
+        description: barber.name,
+      })
+      load()
+    }
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] animate-fade-in-up">
+        <ShieldAlert className="h-12 w-12 text-muted-foreground mb-4" />
+        <h2 className="text-xl font-semibold">Acesso restrito</h2>
+        <p className="text-muted-foreground mt-1">
+          Apenas administradores podem gerenciar barbeiros.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6 animate-fade-in-up">
       <div className="flex flex-col sm:flex-row justify-between gap-4 items-start sm:items-center">
@@ -82,6 +120,7 @@ export default function Barbeiros() {
           <TableHeader>
             <TableRow>
               <TableHead>Nome</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>Cadastrado em</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
@@ -89,25 +128,51 @@ export default function Barbeiros() {
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={3} className="text-center py-8">
+                <TableCell colSpan={4} className="text-center py-8">
                   <Loader2 className="h-6 w-6 animate-spin mx-auto text-accent" />
                 </TableCell>
               </TableRow>
             ) : barbers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                   Nenhum barbeiro cadastrado.
                 </TableCell>
               </TableRow>
             ) : (
               barbers.map((barber) => (
-                <TableRow key={barber.id}>
+                <TableRow key={barber.id} className={!barber.is_active ? 'opacity-50' : ''}>
                   <TableCell className="font-medium">{barber.name}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={barber.is_active ? 'default' : 'secondary'}
+                      className={barber.is_active ? 'bg-emerald-100 text-emerald-800' : ''}
+                    >
+                      {barber.is_active ? 'Ativo' : 'Inativo'}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
                     {new Date(barber.created_at).toLocaleDateString('pt-BR')}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        title="Horários de trabalho"
+                        onClick={() => setSchedulingBarber(barber)}
+                      >
+                        <Clock className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        title={barber.is_active ? 'Desativar' : 'Ativar'}
+                        onClick={() => handleToggleActive(barber)}
+                      >
+                        <Power className="h-4 w-4" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -142,6 +207,11 @@ export default function Barbeiros() {
           onSaved={load}
         />
       )}
+      <WorkingHoursDialog
+        barber={schedulingBarber}
+        open={!!schedulingBarber}
+        onOpenChange={(v) => !v && setSchedulingBarber(null)}
+      />
       <AlertDialog open={!!deletingBarber} onOpenChange={(v) => !v && setDeletingBarber(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>

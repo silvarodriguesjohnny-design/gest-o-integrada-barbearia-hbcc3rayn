@@ -16,6 +16,7 @@ export async function createTransaction(data: {
   category?: string
   payment_method?: string
   customer_id?: string | null
+  created_at?: string
 }): Promise<{ data: Transaction | null; error: any }> {
   const { data: result, error } = await db.from('transactions').insert(data).select('*').single()
   return { data: result as Transaction | null, error }

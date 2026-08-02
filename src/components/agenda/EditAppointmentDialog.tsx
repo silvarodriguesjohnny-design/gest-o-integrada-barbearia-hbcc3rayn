@@ -44,6 +44,7 @@ export function EditAppointmentDialog({
   const [time, setTime] = useState('')
   const [barber, setBarber] = useState('')
   const [serviceId, setServiceId] = useState('')
+  const [status, setStatus] = useState('scheduled')
   const [saving, setSaving] = useState(false)
   const [canceling, setCanceling] = useState(false)
   const [notify, setNotify] = useState(true)
@@ -55,6 +56,7 @@ export function EditAppointmentDialog({
       setTime(dt.toTimeString().slice(0, 5))
       setBarber(appointment.barber_name || '')
       setServiceId(appointment.service_id || '')
+      setStatus(appointment.status || 'scheduled')
     }
   }, [appointment])
 
@@ -69,6 +71,7 @@ export function EditAppointmentDialog({
       service_id: serviceId,
       start_time: start.toISOString(),
       end_time: end.toISOString(),
+      status,
     })
     setSaving(false)
     if (error) toast({ title: 'Erro', description: error.message, variant: 'destructive' })
@@ -140,6 +143,19 @@ export function EditAppointmentDialog({
               <Label className="text-sm font-semibold">Horário</Label>
               <Input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold">Status</Label>
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="scheduled">Agendado</SelectItem>
+                <SelectItem value="confirmed">Confirmado</SelectItem>
+                <SelectItem value="completed">Concluído</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex items-center gap-2 pt-2 border-t">
             <Checkbox checked={notify} onCheckedChange={(v) => setNotify(!!v)} />

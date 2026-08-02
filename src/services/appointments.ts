@@ -101,6 +101,7 @@ export async function updateAppointment(
     service_id?: string
     start_time?: string
     end_time?: string
+    status?: string
   },
 ) {
   const { data: result, error } = await db

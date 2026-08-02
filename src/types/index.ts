@@ -138,6 +138,17 @@ export interface Barber {
   name: string
   created_at: string
   tenant_id: string | null
+  is_active?: boolean
+}
+
+export interface BarberSchedule {
+  id: string
+  barber_id: string
+  day_of_week: number
+  start_time: string
+  end_time: string
+  tenant_id: string | null
+  created_at: string
 }
 
 export interface DashboardMetrics {

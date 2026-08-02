@@ -32,6 +32,7 @@ import {
   Filter,
   X,
 } from 'lucide-react'
+import { AddExpenseDialog } from '@/components/financeiro/AddExpenseDialog'
 import { getTransactions, createTransaction } from '@/services/transactions'
 import { getServices } from '@/services/catalog'
 import { getProducts } from '@/services/products'
@@ -69,6 +70,7 @@ export default function Financeiro() {
   const [exportingExcel, setExportingExcel] = useState(false)
   const [showAddService, setShowAddService] = useState(false)
   const [showAddProduct, setShowAddProduct] = useState(false)
+  const [showAddExpense, setShowAddExpense] = useState(false)
 
   const [fType, setFType] = useState('all')
   const [fCategory, setFCategory] = useState('all')
@@ -226,6 +228,9 @@ export default function Financeiro() {
             </Button>
             <Button variant="outline" size="sm" onClick={() => setShowAddProduct(true)}>
               <Plus className="h-4 w-4 mr-2" /> Novo Produto
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setShowAddExpense(true)}>
+              <ArrowDownToLine className="h-4 w-4 mr-2 text-destructive" /> Nova Despesa
             </Button>
           </div>
           <div className="grid md:grid-cols-2 gap-6">
@@ -577,6 +582,11 @@ export default function Financeiro() {
         open={showAddProduct}
         onOpenChange={setShowAddProduct}
         onCreated={loadProducts}
+      />
+      <AddExpenseDialog
+        open={showAddExpense}
+        onOpenChange={setShowAddExpense}
+        onCreated={loadAll}
       />
     </div>
   )
