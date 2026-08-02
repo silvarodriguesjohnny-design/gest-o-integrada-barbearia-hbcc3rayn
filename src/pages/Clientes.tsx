@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card } from '@/components/ui/card'
 import {
   Table,
@@ -11,32 +11,55 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
-import {
-  Search,
-  Filter,
-  Scissors,
-  Star,
-  Calendar as CalendarIcon,
-  Gift,
-  Loader2,
-  Plus,
-} from 'lucide-react'
-import { getCustomers, createCustomer } from '@/services/customers'
-import { getServices } from '@/services/catalog'
-import { redeemReward } from '@/services/loyalty'
+import { Search, Star, Loader2, Plus, ChevronUp, ChevronDown } from 'lucide-react'
+import { getCustomers } from '@/services/customers'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
-import type { CustomerWithDetails, Service } from '@/types'
+import type { CustomerWithDetails } from '@/types'
 import { PendingTenants } from '@/components/PendingTenants'
 import { NewPendingTenantDialog } from '@/components/NewPendingTenantDialog'
+import { CustomerProfileModal } from '@/components/clientes/CustomerProfileModal'
+import { AddCustomerDialog } from '@/components/clientes/AddCustomerDialog'
 import { useAuth } from '@/hooks/use-auth'
+
+type SortColumn =
+  | 'name'
+  | 'phone'
+  | 'email'
+  | 'cpf'
+  | 'birthday'
+  | 'last_visit_at'
+  | 'days_since_visit'
+  | 'discount_percentage'
+  | 'communication_preferences'
+type SortDirection = 'asc' | 'desc'
+
+function getSortValue(c: CustomerWithDetails, col: SortColumn): string | number | null {
+  switch (col) {
+    case 'name':
+      return c.name?.toLowerCase() ?? null
+    case 'phone':
+      return c.phone?.toLowerCase() ?? null
+    case 'email':
+      return c.email?.toLowerCase() ?? null
+    case 'cpf':
+      return c.cpf?.toLowerCase() ?? null
+    case 'birthday':
+      return c.birthday ?? null
+    case 'last_visit_at':
+      return c.last_visit_at ?? null
+    case 'days_since_visit':
+      return c.last_visit_at
+        ? Math.floor((Date.now() - new Date(c.last_visit_at).getTime()) / 86400000)
+        : null
+    case 'discount_percentage':
+      return c.discount_percentage ?? null
+    case 'communication_preferences':
+      return Array.isArray(c.communication_preferences)
+        ? c.communication_preferences.join(', ').toLowerCase()
+        : null
+  }
+}
 
 export default function Clientes() {
   const [searchTerm, setSearchTerm] = useState('')
@@ -46,6 +69,8 @@ export default function Clientes() {
   const [showPendingDialog, setShowPendingDialog] = useState(false)
   const [pendingRefresh, setPendingRefresh] = useState(0)
   const [activeFilter, setActiveFilter] = useState<'all' | 'vip' | 'active' | 'inactive'>('all')
+  const [sortColumn, setSortColumn] = useState<SortColumn>('name')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const { toast } = useToast()
   const { isSuperAdmin } = useAuth()
 
@@ -62,6 +87,58 @@ export default function Clientes() {
     load()
   }, [])
 
+  const handleSort = (col: SortColumn) => {
+    if (sortColumn === col) {
+      setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortColumn(col)
+      setSortDirection('asc')
+    }
+  }
+
+  const renderSortHeader = (col: SortColumn, label: string, className?: string) => (
+    <TableHead
+      className={cn('cursor-pointer select-none hover:bg-muted/50 transition-colors', className)}
+      onClick={() => handleSort(col)}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        {sortColumn === col &&
+          (sortDirection === 'asc' ? (
+            <ChevronUp className="h-3 w-3" />
+          ) : (
+            <ChevronDown className="h-3 w-3" />
+          ))}
+      </div>
+    </TableHead>
+  )
+
+  const filtered = useMemo(() => {
+    const result = customers.filter((c) => {
+      const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase())
+      if (!matchesSearch) return false
+      if (activeFilter === 'all') return true
+      const stamps = c.loyalty_card?.stamps_count ?? 0
+      const days = c.last_visit_at
+        ? Math.floor((Date.now() - new Date(c.last_visit_at).getTime()) / 86400000)
+        : 999
+      if (activeFilter === 'vip') return stamps >= 10
+      if (activeFilter === 'active') return days <= 30
+      if (activeFilter === 'inactive') return days > 60
+      return true
+    })
+    return result.sort((a, b) => {
+      const aVal = getSortValue(a, sortColumn)
+      const bVal = getSortValue(b, sortColumn)
+      if (aVal === null && bVal === null) return 0
+      if (aVal === null) return 1
+      if (bVal === null) return -1
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1
+      return 0
+    })
+  }, [customers, searchTerm, activeFilter, sortColumn, sortDirection])
+
   const getRetentionColor = (lastVisit: string | null) => {
     if (!lastVisit) return 'bg-red-500'
     const days = Math.floor((Date.now() - new Date(lastVisit).getTime()) / 86400000)
@@ -70,20 +147,6 @@ export default function Clientes() {
     return 'bg-red-500'
   }
 
-  const filtered = customers.filter((c) => {
-    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase())
-    if (!matchesSearch) return false
-    if (activeFilter === 'all') return true
-    const stamps = c.loyalty_card?.stamps_count ?? 0
-    const days = c.last_visit_at
-      ? Math.floor((Date.now() - new Date(c.last_visit_at).getTime()) / 86400000)
-      : 999
-    if (activeFilter === 'vip') return stamps >= 10
-    if (activeFilter === 'active') return days <= 30
-    if (activeFilter === 'inactive') return days > 60
-    return true
-  })
-
   return (
     <div className="space-y-6 animate-fade-in-up">
       <div className="flex flex-col sm:flex-row justify-between gap-4 items-start sm:items-center">
@@ -91,7 +154,7 @@ export default function Clientes() {
           <h1 className="text-3xl font-bold tracking-tight">Gestão de Clientes</h1>
           <p className="text-muted-foreground mt-1">Acompanhe histórico, retenção e fidelidade.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -104,20 +167,20 @@ export default function Clientes() {
           <div className="flex gap-1">
             {(
               [
-                { key: 'all', label: 'Todos' },
-                { key: 'vip', label: 'VIP' },
-                { key: 'active', label: 'Ativos' },
-                { key: 'inactive', label: 'Inativos' },
+                ['all', 'Todos'],
+                ['vip', 'VIP'],
+                ['active', 'Ativos'],
+                ['inactive', 'Inativos'],
               ] as const
-            ).map((f) => (
+            ).map(([key, label]) => (
               <Button
-                key={f.key}
-                variant={activeFilter === f.key ? 'default' : 'outline'}
+                key={key}
+                variant={activeFilter === key ? 'default' : 'outline'}
                 size="sm"
-                onClick={() => setActiveFilter(f.key)}
-                className={activeFilter === f.key ? 'bg-accent text-white' : ''}
+                onClick={() => setActiveFilter(key)}
+                className={activeFilter === key ? 'bg-accent text-white' : ''}
               >
-                {f.label}
+                {label}
               </Button>
             ))}
           </div>
@@ -133,67 +196,102 @@ export default function Clientes() {
       {isSuperAdmin && <PendingTenants refreshTrigger={pendingRefresh} />}
 
       <Card className="hover:shadow-elevation transition-shadow">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>Telefone</TableHead>
-              <TableHead>Última Visita</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {loading ? (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin mx-auto text-accent" />
-                </TableCell>
+                {renderSortHeader('name', 'Nome')}
+                {renderSortHeader('phone', 'Telefone')}
+                {renderSortHeader('email', 'E-mail')}
+                {renderSortHeader('cpf', 'CPF')}
+                {renderSortHeader('birthday', 'Nascimento')}
+                {renderSortHeader('last_visit_at', 'Última Visita')}
+                {renderSortHeader('days_since_visit', 'Dias')}
+                {renderSortHeader('discount_percentage', 'Desc. %')}
+                {renderSortHeader('communication_preferences', 'Comunicação')}
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
-            ) : (
-              filtered.map((customer) => {
-                const stamps = customer.loyalty_card?.stamps_count ?? 0
-                const days = customer.last_visit_at
-                  ? Math.floor((Date.now() - new Date(customer.last_visit_at).getTime()) / 86400000)
-                  : 999
-                return (
-                  <TableRow key={customer.id}>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        {customer.name}
-                        {stamps >= 10 && (
-                          <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{customer.phone || '-'}</TableCell>
-                    <TableCell>
-                      {customer.last_visit_at
-                        ? new Date(customer.last_visit_at).toLocaleDateString('pt-BR')
-                        : 'Nunca'}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={cn(
-                            'h-2.5 w-2.5 rounded-full',
-                            getRetentionColor(customer.last_visit_at),
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={11} className="text-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-accent" />
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filtered.map((customer) => {
+                  const stamps = customer.loyalty_card?.stamps_count ?? 0
+                  const days = customer.last_visit_at
+                    ? Math.floor(
+                        (Date.now() - new Date(customer.last_visit_at).getTime()) / 86400000,
+                      )
+                    : 999
+                  const prefs = Array.isArray(customer.communication_preferences)
+                    ? customer.communication_preferences
+                    : []
+                  return (
+                    <TableRow key={customer.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {customer.name}
+                          {stamps >= 10 && (
+                            <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
                           )}
-                        />
-                        <span className="text-sm text-muted-foreground">
-                          {days > 365 ? 'Nunca' : `${days} dias`}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <CustomerProfileModal customer={customer} onRedeem={load} />
-                    </TableCell>
-                  </TableRow>
-                )
-              })
-            )}
-          </TableBody>
-        </Table>
+                        </div>
+                      </TableCell>
+                      <TableCell>{customer.phone || '-'}</TableCell>
+                      <TableCell>{customer.email || '-'}</TableCell>
+                      <TableCell>{customer.cpf || '-'}</TableCell>
+                      <TableCell>
+                        {customer.birthday
+                          ? new Date(customer.birthday).toLocaleDateString('pt-BR')
+                          : '-'}
+                      </TableCell>
+                      <TableCell>
+                        {customer.last_visit_at
+                          ? new Date(customer.last_visit_at).toLocaleDateString('pt-BR')
+                          : 'Nunca'}
+                      </TableCell>
+                      <TableCell>{days > 365 ? 'Nunca' : days}</TableCell>
+                      <TableCell>
+                        {customer.discount_percentage ? `${customer.discount_percentage}%` : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1 flex-wrap">
+                          {prefs.length > 0
+                            ? prefs.map((p) => (
+                                <Badge key={p} variant="outline" className="text-xs capitalize">
+                                  {p}
+                                </Badge>
+                              ))
+                            : '-'}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={cn(
+                              'h-2.5 w-2.5 rounded-full',
+                              getRetentionColor(customer.last_visit_at),
+                            )}
+                          />
+                          <span className="text-sm text-muted-foreground">
+                            {days > 365 ? 'Nunca' : `${days} dias`}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <CustomerProfileModal customer={customer} onRedeem={load} />
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </Card>
 
       {isSuperAdmin ? (
@@ -209,170 +307,5 @@ export default function Clientes() {
         <AddCustomerDialog open={showAddDialog} onOpenChange={setShowAddDialog} onCreated={load} />
       )}
     </div>
-  )
-}
-
-function CustomerProfileModal({
-  customer,
-  onRedeem,
-}: {
-  customer: CustomerWithDetails
-  onRedeem: () => void
-}) {
-  const { toast } = useToast()
-  const stamps = customer.loyalty_card?.stamps_count ?? 0
-
-  const handleRedeem = async () => {
-    const { error } = await redeemReward(customer.id)
-    if (error) toast({ title: 'Erro', description: error.message, variant: 'destructive' })
-    else {
-      toast({ title: 'Recompensa resgatada!', description: 'Cartão fidelidade resetado.' })
-      onRedeem()
-    }
-  }
-
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="hover:bg-accent/10 hover:text-accent">
-          Ver Perfil
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-3 text-2xl font-serif">
-            {customer.name}
-            {stamps >= 10 && (
-              <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">
-                VIP
-              </Badge>
-            )}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-6 py-4">
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-muted/50 border p-4 rounded-lg flex flex-col justify-center">
-              <div className="text-xs text-muted-foreground mb-1 uppercase font-semibold">
-                Visitas
-              </div>
-              <div className="text-2xl font-bold">{customer.visit_count ?? 0}</div>
-            </div>
-            <div className="bg-muted/50 border p-4 rounded-lg flex flex-col justify-center">
-              <div className="text-xs text-muted-foreground mb-1 uppercase font-semibold">
-                Selos
-              </div>
-              <div className="text-2xl font-bold">{stamps}/12</div>
-            </div>
-            <div className="bg-muted/50 border p-4 rounded-lg flex flex-col justify-center">
-              <div className="text-xs text-muted-foreground mb-1 uppercase font-semibold">
-                Última Visita
-              </div>
-              <div className="text-lg font-bold">
-                {customer.last_visit_at
-                  ? new Date(customer.last_visit_at).toLocaleDateString('pt-BR')
-                  : 'Nunca'}
-              </div>
-            </div>
-          </div>
-          <div>
-            <h3 className="font-serif text-xl font-semibold mb-3">Cartão Fidelidade (12+1)</h3>
-            <div className="grid grid-cols-6 gap-3 sm:gap-4 p-4 rounded-lg border bg-card shadow-sm">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    'aspect-square rounded-full flex items-center justify-center border-2 transition-all duration-300',
-                    i < stamps
-                      ? 'border-accent bg-accent text-white scale-105 shadow-sm'
-                      : 'border-muted bg-transparent text-muted-foreground/30',
-                  )}
-                >
-                  <Scissors className="h-4 w-4 sm:h-5 sm:w-5" />
-                </div>
-              ))}
-              <div
-                className={cn(
-                  'aspect-square rounded-full flex items-center justify-center border-2 border-dashed transition-all',
-                  stamps >= 12
-                    ? 'border-emerald-500 text-emerald-500 bg-emerald-50'
-                    : 'border-muted-foreground/30 text-muted-foreground/30',
-                )}
-              >
-                <Gift className="h-5 w-5 sm:h-6 sm:w-6" />
-              </div>
-            </div>
-            <p className="text-sm text-muted-foreground mt-3 font-medium">
-              {stamps >= 12
-                ? 'Recompensa pronta! Resgate seu serviço grátis.'
-                : `Faltam ${12 - stamps} cortes para ganhar um serviço grátis!`}
-            </p>
-            {stamps >= 12 && (
-              <Button
-                onClick={handleRedeem}
-                className="mt-3 bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                Resgatar Recompensa
-              </Button>
-            )}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function AddCustomerDialog({
-  open,
-  onOpenChange,
-  onCreated,
-}: {
-  open: boolean
-  onOpenChange: (v: boolean) => void
-  onCreated: () => void
-}) {
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [email, setEmail] = useState('')
-  const [birthday, setBirthday] = useState('')
-  const [loading, setLoading] = useState(false)
-  const { toast } = useToast()
-
-  const handleSave = async () => {
-    setLoading(true)
-    const { error } = await createCustomer({ name, phone, email, birthday: birthday || null })
-    setLoading(false)
-    if (error) toast({ title: 'Erro', description: error.message, variant: 'destructive' })
-    else {
-      toast({ title: 'Cliente cadastrado!', description: `${name} foi adicionado.` })
-      setName('')
-      setPhone('')
-      setEmail('')
-      setBirthday('')
-      onOpenChange(false)
-      onCreated()
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle className="font-serif text-2xl">Novo Cliente</DialogTitle>
-        </DialogHeader>
-        <div className="grid gap-4 py-4">
-          <Input placeholder="Nome" value={name} onChange={(e) => setName(e.target.value)} />
-          <Input placeholder="Telefone" value={phone} onChange={(e) => setPhone(e.target.value)} />
-          <Input placeholder="E-mail" value={email} onChange={(e) => setEmail(e.target.value)} />
-          <Input type="date" value={birthday} onChange={(e) => setBirthday(e.target.value)} />
-          <Button
-            onClick={handleSave}
-            disabled={loading || !name}
-            className="bg-accent hover:bg-accent/90 text-white"
-          >
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Salvar
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
   )
 }

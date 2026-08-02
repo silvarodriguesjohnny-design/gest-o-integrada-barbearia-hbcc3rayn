@@ -71,12 +71,14 @@ export async function createAppointment(data: {
 }
 
 export async function getUniqueBarbers(): Promise<{ data: string[] | null; error: any }> {
-  const { data, error } = await db
-    .from('appointments')
-    .select('barber_name')
-    .not('barber_name', 'is', null)
-  if (error) return { data: null, error }
-  const unique = [...new Set((data || []).map((a: any) => a.barber_name).filter(Boolean))]
+  const [apptRes, barberRes] = await Promise.all([
+    db.from('appointments').select('barber_name').not('barber_name', 'is', null),
+    db.from('barbers').select('name').order('name'),
+  ])
+  if (apptRes.error) return { data: null, error: apptRes.error }
+  const apptBarbers = (apptRes.data || []).map((a: any) => a.barber_name).filter(Boolean)
+  const tableBarbers = (barberRes.data || []).map((b: any) => b.name)
+  const unique = [...new Set([...tableBarbers, ...apptBarbers])]
   return { data: unique, error: null }
 }
 

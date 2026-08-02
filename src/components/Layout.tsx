@@ -44,6 +44,7 @@ const NAV_ITEMS = [
   { name: 'Dashboard', path: '/dashboard', icon: Home },
   { name: 'Agenda', path: '/agenda', icon: Calendar },
   { name: 'Clientes', path: '/clientes', icon: Users },
+  { name: 'Barbeiros', path: '/barbeiros', icon: Scissors },
   { name: 'Financeiro', path: '/financeiro', icon: DollarSign },
   { name: 'Campanhas', path: '/campanhas', icon: Gift },
   { name: 'Configurações', path: '/settings', icon: Settings },

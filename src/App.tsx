@@ -9,6 +9,7 @@ import Landing from './pages/Landing'
 import PublicBooking from './pages/PublicBooking'
 import Index from './pages/Index'
 import Clientes from './pages/Clientes'
+import Barbeiros from './pages/Barbeiros'
 import Agenda from './pages/Agenda'
 import Financeiro from './pages/Financeiro'
 import Campanhas from './pages/Campanhas'
@@ -72,6 +73,7 @@ const App = () => (
           >
             <Route path="/dashboard" element={<Index />} />
             <Route path="/clientes" element={<Clientes />} />
+            <Route path="/barbeiros" element={<Barbeiros />} />
             <Route path="/agenda" element={<Agenda />} />
             <Route path="/financeiro" element={<Financeiro />} />
             <Route path="/campanhas" element={<Campanhas />} />

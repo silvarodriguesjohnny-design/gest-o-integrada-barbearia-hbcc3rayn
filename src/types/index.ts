@@ -133,6 +133,13 @@ export interface Partner {
   created_at: string
 }
 
+export interface Barber {
+  id: string
+  name: string
+  created_at: string
+  tenant_id: string | null
+}
+
 export interface DashboardMetrics {
   totalRevenue: number
   serviceRevenue: number
