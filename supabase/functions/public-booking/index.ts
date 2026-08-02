@@ -1,9 +1,12 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { corsHeaders } from '../_shared/cors.ts'
 
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+export const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
+}
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -11,184 +14,214 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+
     const body = await req.json()
-    const supabase = createClient(supabaseUrl, serviceRoleKey)
+    const { action } = body
 
-    switch (body.action) {
-      case 'get_tenant': {
-        const { data: tenant } = await supabase
-          .from('tenants')
-          .select('id, name, logo_url, slug, whatsapp_phone')
-          .eq('id', body.tenant_id)
-          .single()
+    if (action === 'get_tenant') {
+      const { tenant_id } = body
+      const { data: tenant } = await supabase
+        .from('tenants')
+        .select('*')
+        .eq('id', tenant_id)
+        .single()
+      const { data: services } = await supabase
+        .from('services')
+        .select('*')
+        .eq('tenant_id', tenant_id)
+      return new Response(JSON.stringify({ tenant, services: services || [] }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
-        const { data: services } = await supabase
-          .from('services')
-          .select('id, name, description, price, duration_minutes')
-          .eq('tenant_id', body.tenant_id)
+    if (action === 'get_slots') {
+      const { tenant_id, date } = body
+      const [year, month, day] = date.split('-').map(Number)
 
-        return new Response(JSON.stringify({ tenant, services: services || [] }), {
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      const prevDay = new Date(year, month - 1, day - 1, 0, 0, 0)
+      const nextDay = new Date(year, month - 1, day + 1, 23, 59, 59)
+
+      const { data: appointments } = await supabase
+        .from('appointments')
+        .select('start_time, end_time, barber_name, status')
+        .eq('tenant_id', tenant_id)
+        .neq('status', 'cancelled')
+        .gte('start_time', prevDay.toISOString())
+        .lte('start_time', nextDay.toISOString())
+
+      const { data: barbers } = await supabase
+        .from('barbers')
+        .select('id, name')
+        .eq('tenant_id', tenant_id)
+        .eq('is_active', true)
+
+      const { data: schedules } = await supabase
+        .from('barber_schedules')
+        .select('barber_id, day_of_week, start_time, end_time, barbers(name)')
+        .eq('tenant_id', tenant_id)
+
+      const formattedSchedules = (schedules || []).map((s: any) => ({
+        barber_name: s.barbers?.name || '',
+        day_of_week: s.day_of_week,
+        start_time: s.start_time,
+        end_time: s.end_time,
+      }))
+
+      return new Response(
+        JSON.stringify({
+          appointments: appointments || [],
+          barbers: (barbers || []).map((b: any) => b.name),
+          barber_schedules: formattedSchedules,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
+    if (action === 'identify_customer') {
+      const { tenant_id, cpf } = body
+      const cleanCpf = cpf.replace(/\D/g, '')
+      const { data: customer } = await supabase
+        .from('customers')
+        .select('id, name, phone, email, cpf')
+        .eq('tenant_id', tenant_id)
+        .eq('cpf', cleanCpf)
+        .maybeSingle()
+
+      return new Response(JSON.stringify({ customer: customer || null }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (action === 'create_customer') {
+      const { tenant_id, cpf, name, phone, email, communication_preferences } = body
+      const cleanCpf = cpf ? cpf.replace(/\D/g, '') : null
+      const { data: customer, error } = await supabase
+        .from('customers')
+        .insert({
+          tenant_id,
+          cpf: cleanCpf,
+          name,
+          phone,
+          email,
+          communication_preferences: communication_preferences || ['email', 'whatsapp'],
         })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      return new Response(JSON.stringify({ customer }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (action === 'create_booking') {
+      const { tenant_id, service_id, customer_id, barber_name, date, time } = body
+
+      const { data: service } = await supabase
+        .from('services')
+        .select('duration_minutes')
+        .eq('id', service_id)
+        .single()
+
+      const duration = service?.duration_minutes || 30
+
+      const [year, month, day] = date.split('-').map(Number)
+      const [hours, minutes] = time.split(':').map(Number)
+      const startTime = new Date(year, month - 1, day, hours, minutes, 0, 0)
+      const endTime = new Date(startTime.getTime() + duration * 60000)
+
+      let conflictQuery = supabase
+        .from('appointments')
+        .select('id')
+        .eq('tenant_id', tenant_id)
+        .neq('status', 'cancelled')
+        .lt('start_time', endTime.toISOString())
+        .gt('end_time', startTime.toISOString())
+
+      if (barber_name) {
+        conflictQuery = conflictQuery.eq('barber_name', barber_name)
       }
 
-      case 'get_slots': {
-        const date = new Date(body.date)
-        const start = new Date(date)
-        start.setHours(0, 0, 0, 0)
-        const end = new Date(date)
-        end.setHours(23, 59, 59, 999)
+      const { data: conflicts } = await conflictQuery
 
-        const { data: appointments } = await supabase
-          .from('appointments')
-          .select('start_time, end_time, barber_name')
-          .eq('tenant_id', body.tenant_id)
-          .neq('status', 'cancelled')
-          .gte('start_time', start.toISOString())
-          .lte('start_time', end.toISOString())
-
-        const { data: barbersData } = await supabase
-          .from('barbers')
-          .select('id, name, is_active')
-          .eq('tenant_id', body.tenant_id)
-
-        const { data: schedulesData } = await supabase
-          .from('barber_schedules')
-          .select('barber_id, day_of_week, start_time, end_time')
-          .eq('tenant_id', body.tenant_id)
-
-        const barberMap = new Map((barbersData || []).map((b: any) => [b.id, b.name]))
-        const barberSchedules = (schedulesData || [])
-          .map((s: any) => ({
-            barber_name: barberMap.get(s.barber_id) || null,
-            day_of_week: s.day_of_week,
-            start_time: s.start_time,
-            end_time: s.end_time,
-          }))
-          .filter((s: any) => s.barber_name !== null)
-
-        const activeBarberNames = new Set(
-          (barbersData || []).filter((b: any) => b.is_active !== false).map((b: any) => b.name),
-        )
-        const barbers = [...new Set(barberSchedules.map((s: any) => s.barber_name))].filter(
-          (name: string) => activeBarberNames.has(name),
-        )
-
+      if (conflicts && conflicts.length > 0) {
         return new Response(
           JSON.stringify({
-            appointments: appointments || [],
-            barbers,
-            barber_schedules: barberSchedules,
+            error: 'Este horário está indisponível para o profissional selecionado.',
           }),
-          { headers: { 'Content-Type': 'application/json', ...corsHeaders } },
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         )
       }
 
-      case 'identify_customer': {
-        const { data: customer } = await supabase
-          .from('customers')
-          .select('id, name, phone, email, cpf')
-          .eq('tenant_id', body.tenant_id)
-          .eq('cpf', body.cpf)
+      if (barber_name) {
+        const dayOfWeek = startTime.getDay()
+        const { data: barberData } = await supabase
+          .from('barbers')
+          .select('id')
+          .eq('tenant_id', tenant_id)
+          .eq('name', barber_name)
           .single()
 
-        return new Response(JSON.stringify({ customer }), {
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        })
-      }
+        if (barberData) {
+          const { data: schedules } = await supabase
+            .from('barber_schedules')
+            .select('*')
+            .eq('barber_id', barberData.id)
+            .eq('day_of_week', dayOfWeek)
 
-      case 'create_customer': {
-        const { data: customer, error } = await supabase
-          .from('customers')
-          .insert({
-            tenant_id: body.tenant_id,
-            cpf: body.cpf,
-            name: body.name,
-            phone: body.phone,
-            email: body.email || null,
-            communication_preferences: body.communication_preferences || ['email', 'whatsapp'],
-          })
-          .select('id, name, phone, email, cpf')
-          .single()
+          if (schedules && schedules.length > 0) {
+            const timeStr = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+            const endHours = endTime.getHours()
+            const endMins = endTime.getMinutes()
+            const endTimeStr = `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`
 
-        if (error) {
-          return new Response(JSON.stringify({ error: error.message }), {
-            status: 400,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders },
-          })
-        }
+            const isWithinSchedule = schedules.some((s: any) => {
+              return s.start_time <= timeStr && s.end_time >= endTimeStr
+            })
 
-        return new Response(JSON.stringify({ customer }), {
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        })
-      }
-
-      case 'create_booking': {
-        const { data: service } = await supabase
-          .from('services')
-          .select('duration_minutes')
-          .eq('id', body.service_id)
-          .single()
-
-        const duration = service?.duration_minutes || 30
-        const startTime = new Date(`${body.date}T${body.time}`)
-        const endTime = new Date(startTime.getTime() + duration * 60000)
-        const barberName = body.barber_name || null
-
-        if (barberName) {
-          const { data: conflicts } = await supabase
-            .from('appointments')
-            .select('id')
-            .neq('status', 'cancelled')
-            .lt('start_time', endTime.toISOString())
-            .gt('end_time', startTime.toISOString())
-            .eq('tenant_id', body.tenant_id)
-            .eq('barber_name', barberName)
-
-          if (conflicts && conflicts.length > 0) {
-            return new Response(
-              JSON.stringify({ error: 'Conflito de horário detectado para este profissional.' }),
-              { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } },
-            )
+            if (!isWithinSchedule) {
+              return new Response(
+                JSON.stringify({ error: 'O profissional não atende neste horário.' }),
+                { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+              )
+            }
           }
         }
-
-        const { data: appointment, error } = await supabase
-          .from('appointments')
-          .insert({
-            tenant_id: body.tenant_id,
-            customer_id: body.customer_id,
-            service_id: body.service_id,
-            barber_name: barberName,
-            status: 'scheduled',
-            start_time: startTime.toISOString(),
-            end_time: endTime.toISOString(),
-          })
-          .select('*')
-          .single()
-
-        if (error) {
-          return new Response(JSON.stringify({ error: error.message }), {
-            status: 400,
-            headers: { 'Content-Type': 'application/json', ...corsHeaders },
-          })
-        }
-
-        return new Response(JSON.stringify({ appointment }), {
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        })
       }
 
-      default:
-        return new Response(JSON.stringify({ error: 'Invalid action' }), {
-          status: 400,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      const { data: appointment, error } = await supabase
+        .from('appointments')
+        .insert({
+          tenant_id,
+          service_id,
+          customer_id,
+          barber_name: barber_name || null,
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          status: 'scheduled',
         })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      return new Response(JSON.stringify({ appointment }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     }
-  } catch (err) {
-    return new Response(JSON.stringify({ error: (err as Error).message }), {
+
+    return new Response(JSON.stringify({ error: 'Invalid action' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  } catch (err: any) {
+    return new Response(JSON.stringify({ error: err.message || 'Internal server error' }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   }
 })

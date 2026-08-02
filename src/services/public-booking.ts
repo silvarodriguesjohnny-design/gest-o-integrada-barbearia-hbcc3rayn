@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase/client'
+import { formatLocalDateYYYYMMDD } from '@/lib/date-utils'
 
 export interface PublicTenant {
   id: string
@@ -28,11 +29,13 @@ export interface SlotAppointment {
   start_time: string
   end_time: string
   barber_name: string | null
+  status?: string
 }
 
 export interface TimeSlot {
   time: string
   available: boolean
+  reason?: string
 }
 
 export interface PublicBarberSchedule {
@@ -105,95 +108,8 @@ export async function createBooking(data: {
   return { data: result, error }
 }
 
-export function calculateAvailableSlots(
-  appointments: SlotAppointment[],
-  durationMinutes: number,
-  date: Date,
-  startHour = 9,
-  endHour = 20,
-): string[] {
-  const slots: string[] = []
-  const dayStart = new Date(date)
-  dayStart.setHours(startHour, 0, 0, 0)
-  const dayEnd = new Date(date)
-  dayEnd.setHours(endHour, 0, 0, 0)
-
-  let current = new Date(dayStart)
-  while (current < dayEnd) {
-    const slotEnd = new Date(current.getTime() + durationMinutes * 60000)
-    if (slotEnd > dayEnd) break
-
-    const conflict = appointments.some((appt) => {
-      const apptStart = new Date(appt.start_time)
-      const apptEnd = new Date(appt.end_time)
-      return current < apptEnd && slotEnd > apptStart
-    })
-
-    if (!conflict) slots.push(current.toTimeString().slice(0, 5))
-    current = new Date(current.getTime() + 30 * 60000)
-  }
-  return slots
-}
-
-export function calculateAvailableSlotsForBarber(
-  appointments: SlotAppointment[],
-  barberName: string | null,
-  durationMinutes: number,
-  date: Date,
-): string[] {
-  const filtered = barberName
-    ? appointments.filter((a) => a.barber_name === barberName)
-    : appointments
-  return calculateAvailableSlots(filtered, durationMinutes, date)
-}
-
-export function calculateAllSlots(
-  appointments: SlotAppointment[],
-  durationMinutes: number,
-  date: Date,
-  startHour = 9,
-  endHour = 20,
-): TimeSlot[] {
-  const slots: TimeSlot[] = []
-  const dayStart = new Date(date)
-  dayStart.setHours(startHour, 0, 0, 0)
-  const dayEnd = new Date(date)
-  dayEnd.setHours(endHour, 0, 0, 0)
-
-  let current = new Date(dayStart)
-  while (current < dayEnd) {
-    const slotEnd = new Date(current.getTime() + durationMinutes * 60000)
-    if (slotEnd > dayEnd) break
-
-    const conflict = appointments.some((appt) => {
-      const apptStart = new Date(appt.start_time)
-      const apptEnd = new Date(appt.end_time)
-      return current < apptEnd && slotEnd > apptStart
-    })
-
-    slots.push({
-      time: current.toTimeString().slice(0, 5),
-      available: !conflict,
-    })
-    current = new Date(current.getTime() + 30 * 60000)
-  }
-  return slots
-}
-
-export function calculateAllSlotsForBarber(
-  appointments: SlotAppointment[],
-  barberName: string | null,
-  durationMinutes: number,
-  date: Date,
-): TimeSlot[] {
-  const filtered = barberName
-    ? appointments.filter((a) => a.barber_name === barberName)
-    : appointments
-  return calculateAllSlots(filtered, durationMinutes, date)
-}
-
 export function groupSlotsByPeriod(slots: TimeSlot[]): { period: string; slots: TimeSlot[] }[] {
-  const parse = (s: TimeSlot) => parseInt(s.time.split(':')[0])
+  const parse = (s: TimeSlot) => parseInt(s.time.split(':')[0], 10)
   const groups = [
     { period: 'Manhã', slots: slots.filter((s) => parse(s) < 12) },
     { period: 'Tarde', slots: slots.filter((s) => parse(s) >= 12 && parse(s) < 18) },
@@ -202,105 +118,99 @@ export function groupSlotsByPeriod(slots: TimeSlot[]): { period: string; slots: 
   return groups.filter((g) => g.slots.length > 0)
 }
 
-function mergeTimeRanges(
-  ranges: { start: string; end: string }[],
-): { start: string; end: string }[] {
-  if (ranges.length === 0) return []
-  const sorted = [...ranges].sort((a, b) => a.start.localeCompare(b.start))
-  const merged = [{ ...sorted[0] }]
-  for (let i = 1; i < sorted.length; i++) {
-    const last = merged[merged.length - 1]
-    if (sorted[i].start <= last.end) {
-      last.end = sorted[i].end > last.end ? sorted[i].end : last.end
-    } else {
-      merged.push({ ...sorted[i] })
-    }
-  }
-  return merged
-}
-
 export function calculateSlotsWithSchedules(
   appointments: SlotAppointment[],
   barberSchedules: PublicBarberSchedule[],
   selectedBarber: string | null,
   durationMinutes: number,
   date: Date,
+  startHour = 8,
+  endHour = 20,
 ): TimeSlot[] {
   const dayOfWeek = date.getDay()
   const now = new Date()
-  const isToday = date.toDateString() === now.toDateString()
-
-  const buildSlots = (
-    ranges: { start: string; end: string }[],
-    checkConflict: (current: Date, slotEnd: Date) => boolean,
-  ): TimeSlot[] => {
-    const slots: TimeSlot[] = []
-    for (const range of ranges) {
-      const [sH, sM] = range.start.split(':').map(Number)
-      const [eH, eM] = range.end.split(':').map(Number)
-      const current = new Date(date)
-      current.setHours(sH, sM, 0, 0)
-      const rangeEnd = new Date(date)
-      rangeEnd.setHours(eH, eM, 0, 0)
-
-      while (current < rangeEnd) {
-        const slotEnd = new Date(current.getTime() + durationMinutes * 60000)
-        if (slotEnd > rangeEnd) break
-        const conflict = checkConflict(current, slotEnd)
-        const isPast = isToday && current < now
-        slots.push({
-          time: current.toTimeString().slice(0, 5),
-          available: !conflict && !isPast,
-        })
-        current.setTime(current.getTime() + 30 * 60000)
-      }
-    }
-    return slots
-  }
-
-  if (selectedBarber) {
-    const ranges = barberSchedules
-      .filter((s) => s.barber_name === selectedBarber && s.day_of_week === dayOfWeek)
-      .map((s) => ({ start: s.start_time, end: s.end_time }))
-    if (ranges.length === 0) return []
-    const barberAppts = appointments.filter((a) => a.barber_name === selectedBarber)
-    return buildSlots(ranges, (current, slotEnd) =>
-      barberAppts.some((appt) => {
-        const aS = new Date(appt.start_time)
-        const aE = new Date(appt.end_time)
-        return current < aE && slotEnd > aS
-      }),
-    )
-  }
+  const dateStr = formatLocalDateYYYYMMDD(date)
+  const isToday = formatLocalDateYYYYMMDD(now) === dateStr
 
   const daySchedules = barberSchedules.filter((s) => s.day_of_week === dayOfWeek)
-  if (daySchedules.length === 0) return []
-  const barbersWithSchedule = [...new Set(daySchedules.map((s) => s.barber_name))]
-  const merged = mergeTimeRanges(
-    daySchedules.map((s) => ({ start: s.start_time, end: s.end_time })),
-  )
+  const activeBarbers = [...new Set(daySchedules.map((s) => s.barber_name))].filter(Boolean)
 
-  return buildSlots(merged, (current, slotEnd) =>
-    barbersWithSchedule.every((barberName) => {
-      const barberRanges = daySchedules
-        .filter((s) => s.barber_name === barberName)
-        .map((s) => ({ start: s.start_time, end: s.end_time }))
-      const worksNow = barberRanges.some((r) => {
-        const [bsH, bsM] = r.start.split(':').map(Number)
-        const [beH, beM] = r.end.split(':').map(Number)
-        const wS = new Date(date)
-        wS.setHours(bsH, bsM, 0, 0)
-        const wE = new Date(date)
-        wE.setHours(beH, beM, 0, 0)
-        return current >= wS && slotEnd <= wE
-      })
-      if (!worksNow) return true
-      return appointments.some((appt) => {
-        if (appt.barber_name !== barberName) return false
-        const aS = new Date(appt.start_time)
-        const aE = new Date(appt.end_time)
-        return current < aE && slotEnd > aS
-      })
-    }),
-  )
+  let effectiveStart = startHour
+  let effectiveEnd = endHour
+
+  daySchedules.forEach((s) => {
+    const sH = parseInt(s.start_time.split(':')[0], 10)
+    const eH = parseInt(s.end_time.split(':')[0], 10)
+    if (!isNaN(sH) && sH < effectiveStart) effectiveStart = sH
+    if (!isNaN(eH) && eH > effectiveEnd) effectiveEnd = eH
+  })
+
+  const activeAppointments = appointments.filter((a) => !a.status || a.status !== 'cancelled')
+
+  const slots: TimeSlot[] = []
+  const [year, month, day] = dateStr.split('-').map(Number)
+
+  for (let hour = effectiveStart; hour < effectiveEnd; hour++) {
+    for (let minute = 0; minute < 60; minute += 30) {
+      const timeStr = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+      const slotStart = new Date(year, month - 1, day, hour, minute, 0, 0)
+      const slotEnd = new Date(slotStart.getTime() + durationMinutes * 60000)
+
+      const windowEnd = new Date(year, month - 1, day, effectiveEnd, 0, 0, 0)
+      if (slotEnd > windowEnd) {
+        slots.push({ time: timeStr, available: false, reason: 'fora_horario' })
+        continue
+      }
+
+      if (isToday && slotStart < now) {
+        slots.push({ time: timeStr, available: false, reason: 'passado' })
+        continue
+      }
+
+      const isBarberWorking = (barberName: string) => {
+        const bSchedules = daySchedules.filter((s) => s.barber_name === barberName)
+        return bSchedules.some((s) => {
+          const [sH, sM] = s.start_time.split(':').map(Number)
+          const [eH, eM] = s.end_time.split(':').map(Number)
+          const workStart = new Date(year, month - 1, day, sH, sM, 0, 0)
+          const workEnd = new Date(year, month - 1, day, eH, eM, 0, 0)
+          return slotStart >= workStart && slotEnd <= workEnd
+        })
+      }
+
+      const hasBarberConflict = (barberName: string) => {
+        return activeAppointments.some((appt) => {
+          if (appt.barber_name && appt.barber_name !== barberName) return false
+          const aStart = new Date(appt.start_time)
+          const aEnd = new Date(appt.end_time)
+          return slotStart < aEnd && slotEnd > aStart
+        })
+      }
+
+      if (selectedBarber && selectedBarber !== 'all' && selectedBarber !== 'Qualquer') {
+        const working = isBarberWorking(selectedBarber)
+        const conflict = hasBarberConflict(selectedBarber)
+        slots.push({
+          time: timeStr,
+          available: working && !conflict,
+          reason: !working ? 'fora_horario' : conflict ? 'ocupado' : undefined,
+        })
+      } else {
+        if (activeBarbers.length === 0) {
+          slots.push({ time: timeStr, available: false, reason: 'fora_horario' })
+        } else {
+          const availableBarber = activeBarbers.find(
+            (bName) => isBarberWorking(bName) && !hasBarberConflict(bName),
+          )
+          slots.push({
+            time: timeStr,
+            available: !!availableBarber,
+            reason: !availableBarber ? 'indisponivel' : undefined,
+          })
+        }
+      }
+    }
+  }
+
+  return slots
 }

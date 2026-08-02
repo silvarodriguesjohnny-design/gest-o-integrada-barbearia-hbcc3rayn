@@ -20,6 +20,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Loader2, Ban } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { updateAppointment, cancelAppointment } from '@/services/appointments'
+import { formatTimeHHMM, formatLocalDateYYYYMMDD, buildIsoString } from '@/lib/date-utils'
 import type { AppointmentWithRelations, Service } from '@/types'
 
 interface Props {
@@ -51,9 +52,8 @@ export function EditAppointmentDialog({
 
   useEffect(() => {
     if (appointment) {
-      const dt = new Date(appointment.start_time)
-      setDate(dt.toISOString().slice(0, 10))
-      setTime(dt.toTimeString().slice(0, 5))
+      setDate(formatLocalDateYYYYMMDD(appointment.start_time))
+      setTime(formatTimeHHMM(appointment.start_time))
       setBarber(appointment.barber_name || '')
       setServiceId(appointment.service_id || '')
       setStatus(appointment.status || 'scheduled')
@@ -63,8 +63,10 @@ export function EditAppointmentDialog({
   const handleSave = async () => {
     if (!appointment || !date || !time || !serviceId) return
     const service = services.find((s) => s.id === serviceId)
-    const start = new Date(`${date}T${time}`)
+    const isoStart = buildIsoString(date, time)
+    const start = new Date(isoStart)
     const end = new Date(start.getTime() + (service?.duration_minutes || 30) * 60000)
+
     setSaving(true)
     const { error } = await updateAppointment(appointment.id, {
       barber_name: barber || null,
@@ -154,6 +156,7 @@ export function EditAppointmentDialog({
                 <SelectItem value="scheduled">Agendado</SelectItem>
                 <SelectItem value="confirmed">Confirmado</SelectItem>
                 <SelectItem value="completed">Concluído</SelectItem>
+                <SelectItem value="cancelled">Cancelado</SelectItem>
               </SelectContent>
             </Select>
           </div>

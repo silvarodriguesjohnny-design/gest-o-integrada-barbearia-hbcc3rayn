@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,6 +18,7 @@ import {
   type PublicBarberSchedule,
   type SlotAppointment,
 } from '@/services/public-booking'
+import { formatLocalDateYYYYMMDD } from '@/lib/date-utils'
 import { cn } from '@/lib/utils'
 
 export default function PublicBooking() {
@@ -30,7 +31,7 @@ export default function PublicBooking() {
   const [selectedService, setSelectedService] = useState<PublicService | null>(null)
   const [barbers, setBarbers] = useState<string[]>([])
   const [selectedBarber, setSelectedBarber] = useState<string | null>(null)
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10))
+  const [date, setDate] = useState(formatLocalDateYYYYMMDD(new Date()))
   const [appointments, setAppointments] = useState<SlotAppointment[]>([])
   const [barberSchedules, setBarberSchedules] = useState<PublicBarberSchedule[]>([])
   const [loadingSlots, setLoadingSlots] = useState(false)
@@ -73,7 +74,7 @@ export default function PublicBooking() {
           setBarberSchedules(data.barber_schedules || [])
         }
       })
-    }, 5000)
+    }, 10000)
     return () => clearInterval(interval)
   }, [tenantId, date])
 
@@ -91,8 +92,8 @@ export default function PublicBooking() {
     setBooking(false)
     if (error) {
       toast({
-        title: 'Erro',
-        description: error.message || 'Erro ao agendar.',
+        title: 'Erro no agendamento',
+        description: error.message || 'Este horário não está mais disponível.',
         variant: 'destructive',
       })
     } else {
@@ -112,22 +113,27 @@ export default function PublicBooking() {
   if (done) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background p-6 text-center">
-        <CheckCircle2 className="h-16 w-16 text-emerald-500 mb-4" />
+        <CheckCircle2 className="h-16 w-16 text-emerald-500 mb-4 animate-bounce" />
         <h1 className="text-2xl font-bold">Agendamento Confirmado!</h1>
-        <p className="text-muted-foreground mt-2">{customer?.name}, seu horário foi reservado.</p>
+        <p className="text-muted-foreground mt-2">
+          {customer?.name}, seu horário foi reservado com sucesso.
+        </p>
         <Button
-          className="mt-6"
+          className="mt-6 bg-accent hover:bg-accent/90 text-white"
           onClick={() => {
             setDone(false)
             setSelectedService(null)
             setSelectedSlot('')
           }}
         >
-          Novo Agendamento
+          Fazer Novo Agendamento
         </Button>
       </div>
     )
   }
+
+  const [y, m, d] = date ? date.split('-').map(Number) : [2026, 1, 1]
+  const targetDate = new Date(y, m - 1, d)
 
   const slots = selectedService
     ? calculateSlotsWithSchedules(
@@ -135,14 +141,14 @@ export default function PublicBooking() {
         barberSchedules,
         selectedBarber,
         selectedService.duration_minutes,
-        new Date(date),
+        targetDate,
       )
     : []
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-2xl mx-auto space-y-6">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 border-b pb-4">
           {tenant?.logo_url ? (
             <img
               src={tenant.logo_url}
@@ -156,7 +162,7 @@ export default function PublicBooking() {
           )}
           <div>
             <h1 className="text-2xl font-bold">{tenant?.name}</h1>
-            <p className="text-sm text-muted-foreground">Agende seu horário</p>
+            <p className="text-sm text-muted-foreground">Agendamento Online</p>
           </div>
         </div>
 
@@ -164,22 +170,22 @@ export default function PublicBooking() {
           <ClientIdentification tenantId={tenantId!} onIdentified={setCustomer} />
         ) : !selectedService ? (
           <div className="grid gap-3">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 bg-muted/40 p-3 rounded-lg border">
               <User className="h-5 w-5 text-accent" />
               <span className="font-semibold">Olá, {customer.name}!</span>
             </div>
-            <h2 className="text-lg font-semibold">Escolha um serviço</h2>
+            <h2 className="text-lg font-semibold mt-2">Escolha um serviço</h2>
             {services.map((s) => (
               <Card
                 key={s.id}
-                className="cursor-pointer hover:shadow-elevation transition-shadow"
+                className="cursor-pointer hover:border-accent transition-all hover:shadow-elevation"
                 onClick={() => setSelectedService(s)}
               >
                 <CardContent className="flex items-center justify-between p-4">
                   <div>
                     <p className="font-semibold">{s.name}</p>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1">
-                      <Clock className="h-3 w-3" /> {s.duration_minutes} min
+                    <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                      <Clock className="h-3.5 w-3.5" /> {s.duration_minutes} min
                     </p>
                   </div>
                   <span className="text-lg font-bold text-accent">R$ {s.price}</span>
@@ -188,22 +194,24 @@ export default function PublicBooking() {
             ))}
           </div>
         ) : (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-semibold">{selectedService.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  R$ {selectedService.price} · {selectedService.duration_minutes} min
-                </p>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedService(null)}>
-                Trocar
-              </Button>
-            </div>
+          <div className="space-y-6">
+            <Card className="bg-muted/30 border">
+              <CardContent className="flex items-center justify-between p-4">
+                <div>
+                  <p className="font-semibold">{selectedService.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    R$ {selectedService.price} · {selectedService.duration_minutes} min
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setSelectedService(null)}>
+                  Trocar Serviço
+                </Button>
+              </CardContent>
+            </Card>
 
             {barbers.length > 0 && (
               <div className="space-y-2">
-                <Label>Profissional</Label>
+                <Label className="text-sm font-semibold">Selecione o Profissional</Label>
                 <div className="flex flex-wrap gap-2">
                   <Button
                     variant={selectedBarber === null ? 'default' : 'outline'}
@@ -211,7 +219,7 @@ export default function PublicBooking() {
                     className={cn(selectedBarber === null && 'bg-accent text-white')}
                     onClick={() => setSelectedBarber(null)}
                   >
-                    Qualquer
+                    Qualquer Profissional
                   </Button>
                   {barbers.map((b) => (
                     <Button
@@ -228,72 +236,83 @@ export default function PublicBooking() {
               </div>
             )}
 
-            {barbers.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <CalendarX className="h-10 w-10 text-muted-foreground mb-2" />
-                <p className="text-muted-foreground">
-                  Nenhum profissional disponível para agendamento online no momento.
-                </p>
-              </div>
-            )}
-
             <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" /> Data
+              <Label className="flex items-center gap-2 text-sm font-semibold">
+                <Calendar className="h-4 w-4" /> Data do Atendimento
               </Label>
               <Input
                 type="date"
                 value={date}
-                min={new Date().toISOString().slice(0, 10)}
+                min={formatLocalDateYYYYMMDD(new Date())}
                 onChange={(e) => setDate(e.target.value)}
               />
             </div>
 
             {loadingSlots ? (
-              <div className="flex justify-center py-4">
+              <div className="flex justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-accent" />
               </div>
             ) : slots.length === 0 ? (
-              <p className="text-center text-muted-foreground py-4">
-                Nenhum horário disponível para esta data.
-              </p>
+              <div className="flex flex-col items-center justify-center py-8 text-center border rounded-lg bg-muted/20">
+                <CalendarX className="h-10 w-10 text-muted-foreground mb-2" />
+                <p className="text-muted-foreground">
+                  Nenhum horário disponível para a data selecionada.
+                </p>
+              </div>
             ) : (
-              groupSlotsByPeriod(slots).map((group) => (
-                <div key={group.period} className="space-y-2">
-                  <p className="text-sm font-semibold text-muted-foreground">
-                    {group.period}{' '}
-                    <span className="text-xs">
-                      ({group.slots.filter((s) => s.available).length} disponíveis)
-                    </span>
-                  </p>
-                  <div className="grid grid-cols-4 gap-2">
-                    {group.slots.map((slot) => (
-                      <Button
-                        key={slot.time}
-                        variant={selectedSlot === slot.time ? 'default' : 'outline'}
-                        size="sm"
-                        disabled={!slot.available}
-                        className={cn(
-                          selectedSlot === slot.time && 'bg-accent text-white',
-                          !slot.available && 'opacity-40 cursor-not-allowed line-through bg-muted',
-                        )}
-                        onClick={() => slot.available && setSelectedSlot(slot.time)}
-                      >
-                        {slot.time}
-                      </Button>
-                    ))}
+              <div className="space-y-4">
+                {groupSlotsByPeriod(slots).map((group) => (
+                  <div key={group.period} className="space-y-2">
+                    <div className="flex justify-between items-center text-sm font-semibold text-muted-foreground">
+                      <span>{group.period}</span>
+                      <span className="text-xs bg-muted px-2 py-0.5 rounded">
+                        {group.slots.filter((s) => s.available).length} livres
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                      {group.slots.map((slot) => (
+                        <Button
+                          key={slot.time}
+                          type="button"
+                          variant={selectedSlot === slot.time ? 'default' : 'outline'}
+                          size="sm"
+                          disabled={!slot.available}
+                          className={cn(
+                            'flex flex-col items-center py-2 h-auto text-xs transition-all',
+                            selectedSlot === slot.time &&
+                              'bg-accent text-white font-bold ring-2 ring-accent',
+                            !slot.available &&
+                              'opacity-50 bg-muted/60 cursor-not-allowed border-dashed line-through',
+                          )}
+                          onClick={() => slot.available && setSelectedSlot(slot.time)}
+                        >
+                          <span className="font-semibold text-sm">{slot.time}</span>
+                          <span
+                            className={cn(
+                              'text-[10px] font-normal',
+                              slot.available
+                                ? 'text-emerald-600 dark:text-emerald-400 font-medium'
+                                : 'text-destructive font-medium',
+                            )}
+                          >
+                            {slot.available ? 'Disponível' : 'Indisponível'}
+                          </span>
+                        </Button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
 
             {selectedSlot && (
               <Button
-                className="w-full bg-accent hover:bg-accent/90 text-white"
+                className="w-full bg-accent hover:bg-accent/90 text-white font-semibold py-6 text-base shadow-lg"
                 disabled={booking}
                 onClick={handleBook}
               >
-                {booking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Confirmar Agendamento
+                {booking && <Loader2 className="mr-2 h-5 w-5 animate-spin" />} Confirmar Agendamento
+                para {selectedSlot}
               </Button>
             )}
           </div>

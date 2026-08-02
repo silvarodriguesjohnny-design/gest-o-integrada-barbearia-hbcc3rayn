@@ -63,22 +63,63 @@ export type Database = {
           },
         ]
       }
+      barber_schedules: {
+        Row: {
+          barber_id: string
+          created_at: string
+          day_of_week: number
+          end_time: string
+          id: string
+          start_time: string
+          tenant_id: string | null
+        }
+        Insert: {
+          barber_id: string
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          id?: string
+          start_time: string
+          tenant_id?: string | null
+        }
+        Update: {
+          barber_id?: string
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          start_time?: string
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'barber_schedules_barber_id_fkey'
+            columns: ['barber_id']
+            isOneToOne: false
+            referencedRelation: 'barbers'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       barbers: {
         Row: {
           created_at: string
           id: string
+          is_active: boolean
           name: string
           tenant_id: string | null
         }
         Insert: {
           created_at?: string
           id?: string
+          is_active?: boolean
           name: string
           tenant_id?: string | null
         }
         Update: {
           created_at?: string
           id?: string
+          is_active?: boolean
           name?: string
           tenant_id?: string | null
         }
