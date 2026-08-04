@@ -41,8 +41,10 @@ Deno.serve(async (req: Request) => {
       const { tenant_id, date } = body
       const [year, month, day] = date.split('-').map(Number)
 
-      const prevDay = new Date(year, month - 1, day - 1, 0, 0, 0)
-      const nextDay = new Date(year, month - 1, day + 1, 23, 59, 59)
+      const prevDay = new Date(`${date}T00:00:00-03:00`)
+      prevDay.setUTCDate(prevDay.getUTCDate() - 1)
+      const nextDay = new Date(`${date}T23:59:59-03:00`)
+      nextDay.setUTCDate(nextDay.getUTCDate() + 1)
 
       const { data: appointments } = await supabase
         .from('appointments')
@@ -131,7 +133,7 @@ Deno.serve(async (req: Request) => {
 
       const [year, month, day] = date.split('-').map(Number)
       const [hours, minutes] = time.split(':').map(Number)
-      const startTime = new Date(year, month - 1, day, hours, minutes, 0, 0)
+      const startTime = new Date(`${date}T${time}:00-03:00`)
       const endTime = new Date(startTime.getTime() + duration * 60000)
 
       let conflictQuery = supabase
@@ -158,7 +160,7 @@ Deno.serve(async (req: Request) => {
       }
 
       if (barber_name) {
-        const dayOfWeek = startTime.getDay()
+        const dayOfWeek = new Date(year, month - 1, day).getDay()
         const { data: barberData } = await supabase
           .from('barbers')
           .select('id')
@@ -175,9 +177,10 @@ Deno.serve(async (req: Request) => {
 
           if (schedules && schedules.length > 0) {
             const timeStr = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
-            const endHours = endTime.getHours()
-            const endMins = endTime.getMinutes()
-            const endTimeStr = `${String(endHours).padStart(2, '0')}:${String(endMins).padStart(2, '0')}`
+            const endTotalMinutes = hours * 60 + minutes + duration
+            const endH = Math.floor(endTotalMinutes / 60) % 24
+            const endM = endTotalMinutes % 60
+            const endTimeStr = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`
 
             const isWithinSchedule = schedules.some((s: any) => {
               return s.start_time <= timeStr && s.end_time >= endTimeStr
