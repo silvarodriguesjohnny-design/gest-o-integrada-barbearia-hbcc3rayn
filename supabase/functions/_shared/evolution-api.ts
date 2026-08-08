@@ -45,17 +45,51 @@ export function buildWaMeLink(phone: string, text: string): string {
   return `https://wa.me/${number}?text=${encodeURIComponent(text)}`
 }
 
+export function getMissingConfigFields(config: EvolutionConfig | null): string[] {
+  if (!config)
+    return ['config (null/undefined — no WhatsApp configuration record found in messaging_configs)']
+  const missing: string[] = []
+  if (!config.base_url || config.base_url.trim() === '') missing.push('base_url')
+  if (!config.instance_name || config.instance_name.trim() === '') missing.push('instance_name')
+  if (!config.api_key || config.api_key.trim() === '') missing.push('api_key')
+  return missing
+}
+
 export function validateWhatsAppConfig(config: EvolutionConfig | null): string | null {
   if (!config) {
+    console.error(
+      '[evolution-api] validateWhatsAppConfig FAILED — config is null/undefined. No WhatsApp configuration record found in messaging_configs table.',
+    )
     return 'Configuração do WhatsApp não encontrada no banco de dados. Acesse Configurações → Canais de Comunicação e salve as credenciais.'
   }
-  if (!config.base_url) {
+
+  const missing = getMissingConfigFields(config)
+  if (missing.length > 0) {
+    console.error(
+      '[evolution-api] validateWhatsAppConfig FAILED — missing/invalid fields:',
+      missing.join(', '),
+    )
+    console.error('[evolution-api] Current config values:', {
+      base_url: config.base_url ? `(set, length=${config.base_url.length})` : '(empty)',
+      instance_name: config.instance_name ? `(set, value="${config.instance_name}")` : '(empty)',
+      api_key: config.api_key ? `(set, length=${config.api_key.length})` : '(empty)',
+      phone_number: config.phone_number ? '(set)' : '(empty)',
+    })
+  } else {
+    console.log('[evolution-api] validateWhatsAppConfig PASSED — all required fields present:', {
+      base_url: `(set, length=${config.base_url.length})`,
+      instance_name: `"${config.instance_name}"`,
+      api_key: `(set, length=${config.api_key.length})`,
+    })
+  }
+
+  if (missing.includes('base_url')) {
     return 'URL da Instância do WhatsApp não configurada. Acesse Configurações → Canais de Comunicação → WhatsApp e preencha o campo "URL da Instância".'
   }
-  if (!config.instance_name) {
+  if (missing.includes('instance_name')) {
     return 'Nome da Instância do WhatsApp não configurado. Acesse Configurações → Canais de Comunicação → WhatsApp e preencha o campo "Nome da Instância".'
   }
-  if (!config.api_key) {
+  if (missing.includes('api_key')) {
     return 'API Key do WhatsApp não configurada. Acesse Configurações → Canais de Comunicação → WhatsApp e preencha o campo "API Key".'
   }
   return null
@@ -92,8 +126,17 @@ export async function sendWhatsAppMessage(
     '| URL:',
     url,
   )
+  console.log(
+    '[evolution-api] Request payload:',
+    JSON.stringify({
+      number,
+      text: text.slice(0, 100) + (text.length > 100 ? '...' : ''),
+      options: { delay: 300, presence: 'composing' },
+    }),
+  )
 
   try {
+    console.log('[evolution-api] STEP: Calling Evolution API fetch — URL:', url)
     const resp = await fetch(url, {
       method: 'POST',
       headers: {
@@ -107,9 +150,22 @@ export async function sendWhatsAppMessage(
       }),
     })
 
+    console.log(
+      '[evolution-api] STEP: Evolution API fetch completed — HTTP status:',
+      resp.status,
+      resp.statusText,
+    )
+
     if (!resp.ok) {
       const body = await resp.text()
-      console.error('[evolution-api] Send failed with status:', resp.status, 'body:', body)
+      console.error(
+        '[evolution-api] Send FAILED — HTTP status:',
+        resp.status,
+        '| statusText:',
+        resp.statusText,
+        '| response body:',
+        body,
+      )
 
       let friendlyError = ''
 
@@ -162,7 +218,12 @@ export async function sendWhatsAppMessage(
       }
     }
 
-    console.log('[evolution-api] Message successfully sent to formatted number:', number)
+    console.log(
+      '[evolution-api] Message SUCCESSFULLY sent — formatted number:',
+      number,
+      '| HTTP status:',
+      resp.status,
+    )
     return { success: true }
   } catch (err) {
     const errorMsg = `Erro de rede ao conectar com a Evolution API (${url}): ${String(err)}`

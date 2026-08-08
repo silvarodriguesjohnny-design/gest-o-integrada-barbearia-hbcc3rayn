@@ -98,27 +98,6 @@ export async function createBooking(data: {
   const { data: result, error } = await supabase.functions.invoke('public-booking', {
     body: { action: 'create_booking', ...data },
   })
-  if (!error && result?.appointment) {
-    supabase.functions
-      .invoke('send-appointment-notification', {
-        body: { appointment_id: result.appointment.id, type: 'confirmation' },
-      })
-      .then(({ data, error }: any) => {
-        if (error) {
-          console.error('[public-booking] Confirmation notification error:', error)
-        } else if (data && !data.success && data.whatsapp?.error) {
-          console.warn('[public-booking] Confirmation notification issue:', data.whatsapp.error)
-        } else if (data && data.success) {
-          console.log(
-            '[public-booking] Confirmation notification sent successfully for:',
-            result.appointment.id,
-          )
-        }
-      })
-      .catch((err: any) => {
-        console.error('[public-booking] Failed to trigger confirmation notification:', String(err))
-      })
-  }
   return { data: result, error }
 }
 

@@ -5,7 +5,10 @@ import {
   getWhatsAppConfig,
   normalizePhone,
   validateWhatsAppConfig,
+  getMissingConfigFields,
+  buildWaMeLink,
 } from '../_shared/evolution-api.ts'
+import { formatBrasiliaDateTime } from '../_shared/datetime.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -56,54 +59,129 @@ Deno.serve(async (req: Request) => {
 
     const getWaConfig = async (tenantId: string) => {
       if (!tenantWaConfigs[tenantId]) {
+        console.log(
+          '[send-notifications] STEP CONFIG: Reading WhatsApp config for tenant:',
+          tenantId,
+        )
         tenantWaConfigs[tenantId] = await getWhatsAppConfig(supabase, tenantId)
+        const cfg = tenantWaConfigs[tenantId]
+        console.log(
+          '[send-notifications] STEP CONFIG RESULT: tenant:',
+          tenantId,
+          '| config loaded:',
+          !!cfg,
+          '| base_url:',
+          cfg?.base_url ? '(set)' : '(MISSING)',
+          '| instance_name:',
+          cfg?.instance_name || '(MISSING)',
+          '| api_key:',
+          cfg?.api_key ? '(set)' : '(MISSING)',
+        )
       }
       return tenantWaConfigs[tenantId]
     }
 
     const trySendWa = async (tenantId: string, phone: string, msg: string) => {
-      if (!phone) return { waSent: false, error: 'Telefone do destinatário vazio' }
+      if (!phone) {
+        console.error(
+          '[send-notifications] STEP SEND SKIPPED: Phone is empty for tenant:',
+          tenantId,
+        )
+        return { waSent: false, error: 'Telefone do destinatário vazio' }
+      }
+      console.log(
+        '[send-notifications] STEP VALIDATE: Validating WhatsApp config for tenant:',
+        tenantId,
+      )
       const waConfig = await getWaConfig(tenantId)
       const valErr = validateWhatsAppConfig(waConfig)
       if (valErr) {
+        const missing = getMissingConfigFields(waConfig)
         console.error(
-          '[send-notifications] Config validation failed for tenant',
+          '[send-notifications] STEP VALIDATE FAILED: Config validation failed for tenant',
           tenantId,
-          ':',
+          '| error:',
           valErr,
+          '| missing fields:',
+          missing.join(', '),
         )
         return { waSent: false, error: valErr }
       }
+      console.log('[send-notifications] STEP VALIDATE PASSED for tenant:', tenantId)
       console.log(
-        '[send-notifications] Sending WhatsApp to:',
+        '[send-notifications] STEP SEND: Calling Evolution API — target:',
         normalizePhone(phone),
-        'for tenant:',
+        '| tenant:',
         tenantId,
+        '| message length:',
+        msg.length,
       )
       const result = await sendWhatsAppMessage(waConfig!, phone, msg)
-      if (!result.success)
-        console.error('[send-notifications] Send failed for tenant', tenantId, ':', result.error)
+      console.log(
+        '[send-notifications] STEP SEND RESULT: tenant:',
+        tenantId,
+        '| target:',
+        normalizePhone(phone),
+        '| success:',
+        result.success,
+        result.error ? `| error: ${result.error}` : '',
+      )
+      if (!result.success) {
+        console.error(
+          '[send-notifications] STEP SEND FAILED for tenant',
+          tenantId,
+          ':',
+          result.error,
+          result.details ? `| details: ${JSON.stringify(result.details)}` : '',
+        )
+      }
       return { waSent: result.success, error: result.error }
     }
 
     const wasAlreadySent = async (appointmentId: string, channel: string): Promise<boolean> => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('notification_logs')
         .select('id')
         .eq('appointment_id', appointmentId)
         .eq('channel', channel)
+        .eq('status', 'sent')
         .limit(1)
+      if (error) {
+        console.error(
+          '[send-notifications] wasAlreadySent ERROR:',
+          error.message,
+          '| appointment:',
+          appointmentId,
+          '| channel:',
+          channel,
+        )
+      }
       return !!(data && data.length > 0)
     }
 
     const sendApptNotif = async (appt: any, msg: string, channel: string, notifType: string) => {
+      console.log(
+        '[send-notifications] STEP NOTIF: Sending',
+        notifType,
+        'for appointment:',
+        appt.id,
+        '| customer:',
+        appt.customer?.name,
+        '| phone:',
+        appt.customer?.phone,
+      )
       const { waSent, error } = await trySendWa(appt.tenant_id, appt.customer?.phone, msg)
-      console.log('[send-notifications] Logging to notification_logs:', {
-        appointment_id: appt.id,
+      console.log(
+        '[send-notifications] STEP LOG: Logging to notification_logs — appointment_id:',
+        appt.id,
+        '| channel:',
         channel,
-        tenant_id: appt.tenant_id,
-      })
-      await supabase.from('notification_logs').insert({
+        '| status:',
+        waSent ? 'sent' : 'failed',
+        '| tenant_id:',
+        appt.tenant_id,
+      )
+      const { error: logError } = await supabase.from('notification_logs').insert({
         tenant_id: appt.tenant_id,
         appointment_id: appt.id,
         channel,
@@ -112,6 +190,23 @@ Deno.serve(async (req: Request) => {
         notification_type: notifType,
         sent_at: new Date().toISOString(),
       })
+      if (logError) {
+        console.error(
+          '[send-notifications] STEP LOG FAILED: Error logging notification:',
+          logError.message,
+          '| appointment:',
+          appt.id,
+          '| channel:',
+          channel,
+        )
+      } else {
+        console.log(
+          '[send-notifications] STEP LOG SUCCESS: notification_logs insert OK — appointment:',
+          appt.id,
+          '| status:',
+          waSent ? 'sent' : 'failed',
+        )
+      }
       notifications.push({
         type: notifType,
         customer: appt.customer?.name,
@@ -119,75 +214,148 @@ Deno.serve(async (req: Request) => {
         tenant_id: appt.tenant_id,
         whatsapp_sent: waSent,
         error,
-        wa_me: appt.customer?.phone
-          ? `https://wa.me/${normalizePhone(appt.customer.phone)}?text=${encodeURIComponent(msg)}`
-          : null,
+        wa_me: appt.customer?.phone ? buildWaMeLink(appt.customer.phone, msg) : null,
         message: msg,
       })
     }
 
-    // 1. One-day-before reminders (appointments starting 22-26h from now)
+    // 1. One-day-before reminders
+    console.log('[send-notifications] === STEP 1: One-day-before reminders ===')
     const window24Start = new Date(now.getTime() + 22 * 60 * 60 * 1000)
     const window24End = new Date(now.getTime() + 26 * 60 * 60 * 1000)
-    const { data: upcoming24h } = await supabase
+    const { data: upcoming24h, error: upcoming24hError } = await supabase
       .from('appointments')
       .select('*, customer:customers(*), service:services(*), tenant:tenants(name)')
       .in('status', ['scheduled', 'confirmed'])
       .gte('start_time', window24Start.toISOString())
       .lte('start_time', window24End.toISOString())
 
+    if (upcoming24hError) {
+      console.error('[send-notifications] STEP 1 QUERY ERROR:', upcoming24hError.message)
+    }
+    console.log(
+      '[send-notifications] STEP 1: Found',
+      upcoming24h?.length || 0,
+      'appointments in 22-26h window',
+    )
+
     for (const appt of upcoming24h ?? []) {
-      if (await wasAlreadySent(appt.id, 'whatsapp_reminder_1day')) continue
-      const apptDate = new Date(appt.start_time).toLocaleString('pt-BR')
+      if (await wasAlreadySent(appt.id, 'whatsapp_reminder_1day')) {
+        console.log(
+          '[send-notifications] STEP 1: Skipping appointment',
+          appt.id,
+          '— reminder already sent',
+        )
+        continue
+      }
+      const apptDate = formatBrasiliaDateTime(appt.start_time)
       const msg = `⏰ *Lembrete: Seu agendamento é amanhã!*\n\nOlá ${appt.customer?.name}! Este é um lembrete do seu agendamento para ${appt.service?.name} com ${appt.barber_name || 'nosso barbeiro'} amanhã às ${apptDate}.\n\n${appt.tenant?.name}`
       await sendApptNotif(appt, msg, 'whatsapp_reminder_1day', 'appointment_reminder_1day')
     }
 
-    // 2. Same-day reminders (appointments starting from now until end of today)
+    // 2. Same-day reminders
+    console.log('[send-notifications] === STEP 2: Same-day reminders ===')
     const endOfToday = new Date(now)
     endOfToday.setHours(23, 59, 59, 999)
-    const { data: todayAppts } = await supabase
+    const { data: todayAppts, error: todayApptsError } = await supabase
       .from('appointments')
       .select('*, customer:customers(*), service:services(*), tenant:tenants(name)')
       .in('status', ['scheduled', 'confirmed'])
       .gte('start_time', now.toISOString())
       .lte('start_time', endOfToday.toISOString())
 
+    if (todayApptsError) {
+      console.error('[send-notifications] STEP 2 QUERY ERROR:', todayApptsError.message)
+    }
+    console.log('[send-notifications] STEP 2: Found', todayAppts?.length || 0, 'appointments today')
+
     for (const appt of todayAppts ?? []) {
-      if (await wasAlreadySent(appt.id, 'whatsapp_reminder_today')) continue
-      const apptDate = new Date(appt.start_time).toLocaleString('pt-BR')
+      if (await wasAlreadySent(appt.id, 'whatsapp_reminder_today')) {
+        console.log(
+          '[send-notifications] STEP 2: Skipping appointment',
+          appt.id,
+          '— reminder already sent',
+        )
+        continue
+      }
+      const apptDate = formatBrasiliaDateTime(appt.start_time)
       const msg = `⏰ *Lembrete: Seu agendamento é hoje!*\n\nOlá ${appt.customer?.name}! Este é um lembrete do seu agendamento para ${appt.service?.name} com ${appt.barber_name || 'nosso barbeiro'} hoje às ${apptDate}.\n\n${appt.tenant?.name}`
       await sendApptNotif(appt, msg, 'whatsapp_reminder_today', 'appointment_reminder_today')
     }
 
-    // 3. No-show detection (past scheduled appointments not yet processed)
-    const { data: noShowAppts } = await supabase
+    // 3. No-show detection
+    console.log('[send-notifications] === STEP 3: No-show detection ===')
+    const { data: noShowAppts, error: noShowError } = await supabase
       .from('appointments')
       .select('*, customer:customers(*), service:services(*), tenant:tenants(name)')
       .eq('status', 'scheduled')
       .lt('end_time', now.toISOString())
       .neq('reminder_sent', true)
 
+    if (noShowError) {
+      console.error('[send-notifications] STEP 3 QUERY ERROR:', noShowError.message)
+    }
+    console.log(
+      '[send-notifications] STEP 3: Found',
+      noShowAppts?.length || 0,
+      'no-show appointments',
+    )
+
     for (const appt of noShowAppts ?? []) {
       const apptDate = new Date(appt.start_time).toLocaleString('pt-BR')
       const msg = `⚠️ *Aviso de Ausência*\n\nOlá ${appt.customer?.name}!\nNotamos que você não compareceu ao agendamento de ${appt.service?.name} em ${apptDate}.\nEntre em contato para remarcar!\n\n${appt.tenant?.name}`
       await sendApptNotif(appt, msg, 'whatsapp_absence', 'absence_alert')
-      await supabase
+      console.log(
+        '[send-notifications] STEP 3: Marking appointment',
+        appt.id,
+        'as cancelled + reminder_sent',
+      )
+      const { error: updateError } = await supabase
         .from('appointments')
         .update({ status: 'cancelled', reminder_sent: true })
         .eq('id', appt.id)
+      if (updateError) {
+        console.error(
+          '[send-notifications] STEP 3: Error updating appointment status:',
+          updateError.message,
+        )
+      }
     }
 
     // 4. Birthday notifications
-    const { data: birthdayCustomers } = await supabase
+    console.log('[send-notifications] === STEP 4: Birthday notifications ===')
+    const { data: birthdayCustomers, error: birthdayError } = await supabase
       .from('customers')
       .select('*')
       .filter('birthday', 'like', `%-${todayMonthDay}`)
 
+    if (birthdayError) {
+      console.error('[send-notifications] STEP 4 QUERY ERROR:', birthdayError.message)
+    }
+    console.log(
+      '[send-notifications] STEP 4: Found',
+      birthdayCustomers?.length || 0,
+      'birthday customers',
+    )
+
     for (const customer of birthdayCustomers ?? []) {
       const msg = `🎂 *Feliz Aniversário!*\n\nFeliz aniversário ${customer.name}! Venha comemorar com a gente!`
+      console.log(
+        '[send-notifications] STEP 4: Sending birthday message to:',
+        customer.name,
+        '| phone:',
+        customer.phone,
+        '| tenant:',
+        customer.tenant_id,
+      )
       const { waSent, error } = await trySendWa(customer.tenant_id, customer.phone, msg)
-      await supabase.from('notification_logs').insert({
+      console.log(
+        '[send-notifications] STEP 4 LOG: Logging birthday notification — customer:',
+        customer.name,
+        '| status:',
+        waSent ? 'sent' : 'failed',
+      )
+      const { error: logError } = await supabase.from('notification_logs').insert({
         tenant_id: customer.tenant_id,
         channel: 'whatsapp_birthday',
         body: msg,
@@ -195,6 +363,9 @@ Deno.serve(async (req: Request) => {
         notification_type: 'birthday',
         sent_at: new Date().toISOString(),
       })
+      if (logError) {
+        console.error('[send-notifications] STEP 4 LOG FAILED:', logError.message)
+      }
       notifications.push({
         type: 'birthday',
         customer: customer.name,
@@ -207,23 +378,61 @@ Deno.serve(async (req: Request) => {
     }
 
     // 5. Inactivity alerts
-    const { data: alerts } = await supabase
+    console.log('[send-notifications] === STEP 5: Inactivity alerts ===')
+    const { data: alerts, error: alertsError } = await supabase
       .from('inactivity_alerts')
       .select('*, tenants(id, name)')
       .eq('active', true)
 
+    if (alertsError) {
+      console.error('[send-notifications] STEP 5 QUERY ERROR:', alertsError.message)
+    }
+    console.log(
+      '[send-notifications] STEP 5: Found',
+      alerts?.length || 0,
+      'active inactivity alerts',
+    )
+
     for (const alert of alerts ?? []) {
       const cutoffDate = new Date(now)
       cutoffDate.setDate(cutoffDate.getDate() - alert.days)
-      const { data: inactiveCustomers } = await supabase
+      const { data: inactiveCustomers, error: inactiveError } = await supabase
         .from('customers')
         .select('*')
         .eq('tenant_id', alert.tenant_id)
         .or(`last_visit_at.is.null,last_visit_at.lt.${cutoffDate.toISOString()}`)
+      if (inactiveError) {
+        console.error(
+          '[send-notifications] STEP 5 QUERY ERROR (inactive customers):',
+          inactiveError.message,
+        )
+      }
+      console.log(
+        '[send-notifications] STEP 5: Found',
+        inactiveCustomers?.length || 0,
+        'inactive customers for alert:',
+        alert.id,
+        '| tenant:',
+        alert.tenant_id,
+      )
       for (const customer of inactiveCustomers ?? []) {
         const msg = (alert.message || '').replace(/\{nome\}/g, customer.name || '')
+        console.log(
+          '[send-notifications] STEP 5: Sending inactivity alert to:',
+          customer.name,
+          '| phone:',
+          customer.phone,
+          '| tenant:',
+          alert.tenant_id,
+        )
         const { waSent, error } = await trySendWa(alert.tenant_id, customer.phone, msg)
-        await supabase.from('notification_logs').insert({
+        console.log(
+          '[send-notifications] STEP 5 LOG: Logging inactivity notification — customer:',
+          customer.name,
+          '| status:',
+          waSent ? 'sent' : 'failed',
+        )
+        const { error: logError } = await supabase.from('notification_logs').insert({
           tenant_id: alert.tenant_id,
           channel: 'whatsapp_inactivity',
           body: msg,
@@ -231,6 +440,9 @@ Deno.serve(async (req: Request) => {
           notification_type: 'inactivity_alert',
           sent_at: new Date().toISOString(),
         })
+        if (logError) {
+          console.error('[send-notifications] STEP 5 LOG FAILED:', logError.message)
+        }
         notifications.push({
           type: 'inactivity_alert',
           customer: customer.name,
@@ -244,12 +456,22 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    console.log(
+      '[send-notifications] === COMPLETE: Total notifications processed:',
+      notifications.length,
+      '===',
+    )
     return new Response(
       JSON.stringify({ success: true, count: notifications.length, notifications }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } },
     )
   } catch (err) {
-    console.error('[send-notifications] Fatal error:', String(err))
+    console.error(
+      '[send-notifications] CRITICAL: Fatal error:',
+      String(err),
+      '| stack:',
+      (err as Error)?.stack,
+    )
     return new Response(
       JSON.stringify({ error: 'Failed to process notifications', detail: String(err) }),
       { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } },

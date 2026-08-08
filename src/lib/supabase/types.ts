@@ -61,6 +61,13 @@ export type Database = {
             referencedRelation: 'services'
             referencedColumns: ['id']
           },
+          {
+            foreignKeyName: 'appointments_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
         ]
       }
       barber_schedules: {
@@ -204,7 +211,15 @@ export type Database = {
           phone?: string | null
           tenant_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'customers_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
       }
       email_logs: {
         Row: {
@@ -586,7 +601,15 @@ export type Database = {
           price?: number
           tenant_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: 'services_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
       }
       tenants: {
         Row: {
