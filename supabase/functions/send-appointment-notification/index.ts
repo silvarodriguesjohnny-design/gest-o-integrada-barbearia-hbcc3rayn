@@ -1,27 +1,30 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { corsHeaders } from '../_shared/cors.ts'
 import {
   sendWhatsAppMessage,
   getWhatsAppConfig,
-  normalizePhone,
   validateWhatsAppConfig,
   buildWaMeLink,
 } from '../_shared/evolution-api.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-  )
+  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    console.error(
+      '[send-appointment-notification] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY',
+    )
+    return new Response(JSON.stringify({ error: 'Server configuration missing' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    })
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
   try {
     const { appointment_id, type = 'confirmation' } = await req.json()
@@ -48,7 +51,18 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    // Duplicate-send protection: skip if a confirmation was already sent for this appointment
+    console.log(
+      '[send-appointment-notification] Appointment loaded:',
+      '| id:',
+      appt.id,
+      '| tenant_id:',
+      appt.tenant_id,
+      '| customer:',
+      appt.customer?.name,
+      '| phone:',
+      appt.customer?.phone,
+    )
+
     if (type === 'confirmation') {
       const { data: existingLogs } = await supabase
         .from('notification_logs')
@@ -56,14 +70,13 @@ Deno.serve(async (req: Request) => {
         .eq('appointment_id', appointment_id)
         .eq('channel', 'whatsapp')
         .eq('notification_type', 'confirmation')
+        .eq('status', 'sent')
         .limit(1)
 
       if (existingLogs && existingLogs.length > 0) {
         console.log(
-          '[send-appointment-notification] Confirmation already sent for appointment:',
+          '[send-appointment-notification] Confirmation already sent successfully for appointment:',
           appointment_id,
-          '| existing status:',
-          existingLogs[0].status,
         )
         return new Response(
           JSON.stringify({
@@ -85,17 +98,6 @@ Deno.serve(async (req: Request) => {
       absence: `⚠️ *Aviso de Ausência*\n\nOlá ${appt.customer?.name}!\nNotamos que você não compareceu ao agendamento de ${appt.service?.name} em ${dateStr}.\nEntre em contato para remarcar!\n\n${appt.tenant?.name}`,
     }
     const body = messages[type] || messages.confirmation
-
-    console.log(
-      '[send-appointment-notification] Message type:',
-      type,
-      '| Customer:',
-      appt.customer?.name,
-      '| Phone:',
-      appt.customer?.phone,
-      '| Tenant:',
-      appt.tenant_id,
-    )
 
     console.log(
       '[send-appointment-notification] Loading WhatsApp config for tenant:',
@@ -133,45 +135,22 @@ Deno.serve(async (req: Request) => {
       waResult = { success: false, error: noPhoneErr }
       logBody = `[FALHA] ${noPhoneErr}\n\n${body}`
     } else {
-      const normalizedPhone = normalizePhone(appt.customer.phone)
       console.log(
-        '[send-appointment-notification] Phone normalized:',
-        '| Original:',
+        '[send-appointment-notification] Sending WhatsApp message to:',
         appt.customer.phone,
-        '| Normalized:',
-        normalizedPhone,
       )
+      const result = await sendWhatsAppMessage(waConfig!, appt.customer.phone, body)
+      waResult = { ...result, wa_me: buildWaMeLink(appt.customer.phone, body) }
 
-      if (!normalizedPhone || normalizedPhone.length < 10) {
-        const invalidErr = `O telefone do cliente ("${appt.customer.phone}") é inválido ou está incompleto após a normalização.`
-        console.error('[send-appointment-notification]', invalidErr)
-        waResult = {
-          success: false,
-          error: invalidErr,
-          wa_me: buildWaMeLink(appt.customer.phone, body),
-        }
-        logBody = `[FALHA] ${invalidErr}\n\n${body}`
+      if (result.success) {
+        logStatus = 'sent'
+        console.log('[send-appointment-notification] Message sent successfully')
       } else {
-        console.log('[send-appointment-notification] Sending WhatsApp message to:', normalizedPhone)
-        const result = await sendWhatsAppMessage(waConfig!, normalizedPhone, body)
-        waResult = { ...result, wa_me: buildWaMeLink(appt.customer.phone, body) }
-
-        if (result.success) {
-          logStatus = 'sent'
-          console.log(
-            '[send-appointment-notification] Message sent successfully to:',
-            normalizedPhone,
-          )
-        } else {
-          const friendlyError = result.error || 'Falha desconhecida ao enviar mensagem.'
-          logBody = `[FALHA ENVIO] ${friendlyError}\n\n${body}`
-          console.error('[send-appointment-notification] Send failed:', friendlyError)
-          if (result.details) {
-            console.error(
-              '[send-appointment-notification] Details:',
-              JSON.stringify(result.details),
-            )
-          }
+        const friendlyError = result.error || 'Falha desconhecida ao enviar mensagem.'
+        logBody = `[FALHA ENVIO] ${friendlyError}\n\n${body}`
+        console.error('[send-appointment-notification] Send failed:', friendlyError)
+        if (result.details) {
+          console.error('[send-appointment-notification] Details:', JSON.stringify(result.details))
         }
       }
     }
@@ -180,15 +159,12 @@ Deno.serve(async (req: Request) => {
       '[send-appointment-notification] Logging to notification_logs:',
       '| appointment_id:',
       appt.id,
-      '| channel: whatsapp',
-      '| type:',
-      type,
       '| status:',
       logStatus,
       '| tenant_id:',
       appt.tenant_id,
     )
-    await supabase.from('notification_logs').insert({
+    const { error: logError } = await supabase.from('notification_logs').insert({
       tenant_id: appt.tenant_id,
       appointment_id: appt.id,
       channel: 'whatsapp',
@@ -197,6 +173,10 @@ Deno.serve(async (req: Request) => {
       notification_type: type,
       sent_at: new Date().toISOString(),
     })
+
+    if (logError) {
+      console.error('[send-appointment-notification] Failed to log notification:', logError.message)
+    }
 
     return new Response(
       JSON.stringify({

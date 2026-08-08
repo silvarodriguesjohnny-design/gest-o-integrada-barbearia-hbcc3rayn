@@ -78,7 +78,7 @@ export async function sendWhatsAppMessage(
   const number = normalizePhone(toPhone)
 
   if (!number || number.length < 10) {
-    const err = `Telefone do destinatário ("${toPhone}") é inválido ou está incompleto.`
+    const err = `O telefone "${toPhone}" é inválido ou está incompleto após a normalização (${number || 'vazio'}). Verifique se o número possui DDD válido.`
     console.error('[evolution-api]', err)
     return { success: false, error: err }
   }

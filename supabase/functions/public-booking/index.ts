@@ -212,6 +212,18 @@ Deno.serve(async (req: Request) => {
 
       if (error) throw error
 
+      const notifyUrl = `${supabaseUrl}/functions/v1/send-appointment-notification`
+      fetch(notifyUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${supabaseServiceKey}`,
+        },
+        body: JSON.stringify({ appointment_id: appointment.id, type: 'confirmation' }),
+      }).catch((err: unknown) => {
+        console.error('[public-booking] Failed to trigger confirmation notification:', String(err))
+      })
+
       return new Response(JSON.stringify({ appointment }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })

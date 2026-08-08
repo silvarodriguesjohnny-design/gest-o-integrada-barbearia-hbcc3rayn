@@ -368,7 +368,9 @@ export type Database = {
           channel: string
           created_at: string
           id: string
+          notification_type: string | null
           sent_at: string
+          status: string
           tenant_id: string | null
         }
         Insert: {
@@ -377,7 +379,9 @@ export type Database = {
           channel: string
           created_at?: string
           id?: string
+          notification_type?: string | null
           sent_at?: string
+          status?: string
           tenant_id?: string | null
         }
         Update: {
@@ -386,7 +390,9 @@ export type Database = {
           channel?: string
           created_at?: string
           id?: string
+          notification_type?: string | null
           sent_at?: string
+          status?: string
           tenant_id?: string | null
         }
         Relationships: []

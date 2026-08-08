@@ -93,22 +93,26 @@ export async function createAppointment(data: {
     .select('*')
     .single()
 
+  let notification: any = undefined
   if (result) {
-    db.functions
-      .invoke('send-appointment-notification', {
-        body: { appointment_id: result.id, type: 'confirmation' },
-      })
-      .then(({ data }: any) => {
-        if (data && !data.success && data.whatsapp?.error) {
-          console.warn('[appointments] Confirmation notification issue:', data.whatsapp.error)
-        }
-      })
-      .catch((err: any) => {
-        console.error('[appointments] Failed to trigger confirmation notification:', String(err))
-      })
+    try {
+      const { data: notifData, error: notifError } = await db.functions.invoke(
+        'send-appointment-notification',
+        { body: { appointment_id: result.id, type: 'confirmation' } },
+      )
+      if (notifError) {
+        console.error('[appointments] Confirmation notification error:', notifError)
+      }
+      if (notifData && !notifData.success && notifData.whatsapp?.error) {
+        console.warn('[appointments] Confirmation notification issue:', notifData.whatsapp.error)
+      }
+      notification = notifData
+    } catch (err: any) {
+      console.error('[appointments] Failed to trigger confirmation notification:', String(err))
+    }
   }
 
-  return { data: result as Appointment | null, error }
+  return { data: result as Appointment | null, error, notification }
 }
 
 export async function getUniqueBarbers(): Promise<{ data: string[] | null; error: any }> {

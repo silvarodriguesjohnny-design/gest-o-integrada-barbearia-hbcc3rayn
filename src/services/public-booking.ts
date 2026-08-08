@@ -103,9 +103,16 @@ export async function createBooking(data: {
       .invoke('send-appointment-notification', {
         body: { appointment_id: result.appointment.id, type: 'confirmation' },
       })
-      .then(({ data }: any) => {
-        if (data && !data.success && data.whatsapp?.error) {
+      .then(({ data, error }: any) => {
+        if (error) {
+          console.error('[public-booking] Confirmation notification error:', error)
+        } else if (data && !data.success && data.whatsapp?.error) {
           console.warn('[public-booking] Confirmation notification issue:', data.whatsapp.error)
+        } else if (data && data.success) {
+          console.log(
+            '[public-booking] Confirmation notification sent successfully for:',
+            result.appointment.id,
+          )
         }
       })
       .catch((err: any) => {

@@ -311,7 +311,7 @@ function NewBookingModal({ onCreated, barbers }: { onCreated: () => void; barber
     setLoading(true)
     const startTimeIso = buildIsoString(date, selectedSlot)
 
-    const { error } = await createAppointment({
+    const { error, notification } = await createAppointment({
       customer_id: customerId,
       service_id: serviceId,
       barber_name: barber || undefined,
@@ -324,6 +324,13 @@ function NewBookingModal({ onCreated, barbers }: { onCreated: () => void; barber
       toast({ title: 'Erro', description: error.message, variant: 'destructive' })
     } else {
       toast({ title: 'Agendamento criado', description: 'Horário reservado com sucesso.' })
+      if (notification && !notification.success && notification.whatsapp?.error) {
+        toast({
+          title: 'Aviso: Confirmação por WhatsApp',
+          description: notification.whatsapp.error,
+          variant: 'destructive',
+        })
+      }
       setOpen(false)
       setSelectedSlot('')
       onCreated()
