@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Clock, Plus, Share2, User, Loader2, MessageCircle, Pencil, CalendarX } from 'lucide-react'
+import { Clock, Plus, User, Loader2, MessageCircle, Pencil, CalendarX } from 'lucide-react'
 import { EditAppointmentDialog } from '@/components/agenda/EditAppointmentDialog'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
@@ -101,13 +101,6 @@ export default function Agenda() {
     }
   }, [date])
 
-  const bookingLink = `${window.location.origin}/book/${tenant?.id || ''}`
-
-  const copyLink = () => {
-    navigator.clipboard.writeText(bookingLink)
-    toast({ title: 'Link copiado!', description: 'Envie para seus clientes agendarem online.' })
-  }
-
   const filteredAppointments =
     selectedBarber === 'all'
       ? appointments
@@ -121,13 +114,6 @@ export default function Agenda() {
           <p className="text-muted-foreground mt-1">Gerencie seus horários e agendamentos.</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            onClick={copyLink}
-            className="transition-transform active:scale-95"
-          >
-            <Share2 className="h-4 w-4 mr-2" /> Link Público
-          </Button>
           {tenant?.whatsapp_phone && (
             <a
               href={`https://wa.me/${tenant.whatsapp_phone.replace(/\D/g, '')}?text=${encodeURIComponent('Olá! Gostaria de agendar um horário.')}`}

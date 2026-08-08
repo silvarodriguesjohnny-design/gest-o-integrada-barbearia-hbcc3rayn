@@ -736,6 +736,7 @@ export type Database = {
       }
       get_user_tenant_id: { Args: never; Returns: string }
       is_super_admin: { Args: never; Returns: boolean }
+      trigger_send_notifications: { Args: never; Returns: undefined }
     }
     Enums: {
       appointment_status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled'

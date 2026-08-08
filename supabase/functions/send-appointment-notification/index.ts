@@ -5,6 +5,7 @@ import {
   getWhatsAppConfig,
   normalizePhone,
   validateWhatsAppConfig,
+  buildWaMeLink,
 } from '../_shared/evolution-api.ts'
 
 const corsHeaders = {
@@ -47,13 +48,34 @@ Deno.serve(async (req: Request) => {
       })
     }
 
-    const { data: configs } = await supabase
-      .from('messaging_configs')
-      .select('channel')
-      .eq('tenant_id', appt.tenant_id)
-      .eq('is_active', true)
-    let channels = (configs || []).map((c: any) => c.channel)
-    if (channels.length === 0) channels = ['email']
+    // Duplicate-send protection: skip if a confirmation was already sent for this appointment
+    if (type === 'confirmation') {
+      const { data: existingLogs } = await supabase
+        .from('notification_logs')
+        .select('id, status')
+        .eq('appointment_id', appointment_id)
+        .eq('channel', 'whatsapp')
+        .eq('notification_type', 'confirmation')
+        .limit(1)
+
+      if (existingLogs && existingLogs.length > 0) {
+        console.log(
+          '[send-appointment-notification] Confirmation already sent for appointment:',
+          appointment_id,
+          '| existing status:',
+          existingLogs[0].status,
+        )
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: 'Confirmação já foi enviada anteriormente para este agendamento.',
+            duplicate: true,
+            type,
+          }),
+          { headers: { 'Content-Type': 'application/json', ...corsHeaders } },
+        )
+      }
+    }
 
     const dateStr = new Date(appt.start_time).toLocaleString('pt-BR')
     const messages: Record<string, string> = {
@@ -65,46 +87,124 @@ Deno.serve(async (req: Request) => {
     const body = messages[type] || messages.confirmation
 
     console.log(
+      '[send-appointment-notification] Message type:',
+      type,
+      '| Customer:',
+      appt.customer?.name,
+      '| Phone:',
+      appt.customer?.phone,
+      '| Tenant:',
+      appt.tenant_id,
+    )
+
+    console.log(
       '[send-appointment-notification] Loading WhatsApp config for tenant:',
       appt.tenant_id,
     )
     const waConfig = await getWhatsAppConfig(supabase, appt.tenant_id)
+    console.log(
+      '[send-appointment-notification] WhatsApp config loaded:',
+      '| base_url:',
+      waConfig?.base_url || '(missing)',
+      '| instance:',
+      waConfig?.instance_name || '(missing)',
+      '| api_key present:',
+      !!waConfig?.api_key,
+    )
+
     const valErr = validateWhatsAppConfig(waConfig)
-    let waResult: { success: boolean; error?: string; details?: any; wa_me?: string } | null = null
+    let waResult: { success: boolean; error?: string; details?: any; wa_me?: string } = {
+      success: false,
+      error: 'Not processed',
+    }
+    let logStatus = 'failed'
+    let logBody = body
 
     if (valErr) {
       console.error('[send-appointment-notification] Config validation failed:', valErr)
+      waResult = { success: false, error: valErr }
+      logBody = `[FALHA CONFIG] ${valErr}\n\n${body}`
       if (appt.customer?.phone) {
-        const phone = normalizePhone(appt.customer.phone)
+        waResult.wa_me = buildWaMeLink(appt.customer.phone, body)
+      }
+    } else if (!appt.customer?.phone) {
+      const noPhoneErr = 'Cliente não possui número de telefone cadastrado.'
+      console.error('[send-appointment-notification]', noPhoneErr)
+      waResult = { success: false, error: noPhoneErr }
+      logBody = `[FALHA] ${noPhoneErr}\n\n${body}`
+    } else {
+      const normalizedPhone = normalizePhone(appt.customer.phone)
+      console.log(
+        '[send-appointment-notification] Phone normalized:',
+        '| Original:',
+        appt.customer.phone,
+        '| Normalized:',
+        normalizedPhone,
+      )
+
+      if (!normalizedPhone || normalizedPhone.length < 10) {
+        const invalidErr = `O telefone do cliente ("${appt.customer.phone}") é inválido ou está incompleto após a normalização.`
+        console.error('[send-appointment-notification]', invalidErr)
         waResult = {
           success: false,
-          error: valErr,
-          wa_me: `https://wa.me/${phone}?text=${encodeURIComponent(body)}`,
+          error: invalidErr,
+          wa_me: buildWaMeLink(appt.customer.phone, body),
+        }
+        logBody = `[FALHA] ${invalidErr}\n\n${body}`
+      } else {
+        console.log('[send-appointment-notification] Sending WhatsApp message to:', normalizedPhone)
+        const result = await sendWhatsAppMessage(waConfig!, normalizedPhone, body)
+        waResult = { ...result, wa_me: buildWaMeLink(appt.customer.phone, body) }
+
+        if (result.success) {
+          logStatus = 'sent'
+          console.log(
+            '[send-appointment-notification] Message sent successfully to:',
+            normalizedPhone,
+          )
+        } else {
+          const friendlyError = result.error || 'Falha desconhecida ao enviar mensagem.'
+          logBody = `[FALHA ENVIO] ${friendlyError}\n\n${body}`
+          console.error('[send-appointment-notification] Send failed:', friendlyError)
+          if (result.details) {
+            console.error(
+              '[send-appointment-notification] Details:',
+              JSON.stringify(result.details),
+            )
+          }
         }
       }
-    } else if (appt.customer?.phone) {
-      const phone = normalizePhone(appt.customer.phone)
-      console.log('[send-appointment-notification] Sending to:', phone)
-      const result = await sendWhatsAppMessage(waConfig!, phone, body)
-      waResult = { ...result, wa_me: `https://wa.me/${phone}?text=${encodeURIComponent(body)}` }
-      if (!result.success)
-        console.error('[send-appointment-notification] Send failed:', result.error)
     }
 
-    for (const channel of channels) {
-      await supabase
-        .from('notification_logs')
-        .insert({
-          tenant_id: appt.tenant_id,
-          appointment_id: appt.id,
-          channel,
-          body,
-          sent_at: new Date().toISOString(),
-        })
-    }
+    console.log(
+      '[send-appointment-notification] Logging to notification_logs:',
+      '| appointment_id:',
+      appt.id,
+      '| channel: whatsapp',
+      '| type:',
+      type,
+      '| status:',
+      logStatus,
+      '| tenant_id:',
+      appt.tenant_id,
+    )
+    await supabase.from('notification_logs').insert({
+      tenant_id: appt.tenant_id,
+      appointment_id: appt.id,
+      channel: 'whatsapp',
+      body: logBody,
+      status: logStatus,
+      notification_type: type,
+      sent_at: new Date().toISOString(),
+    })
 
     return new Response(
-      JSON.stringify({ success: true, channels, type, body, whatsapp: waResult }),
+      JSON.stringify({
+        success: waResult.success,
+        type,
+        body,
+        whatsapp: waResult,
+      }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } },
     )
   } catch (err) {

@@ -98,7 +98,14 @@ export async function createAppointment(data: {
       .invoke('send-appointment-notification', {
         body: { appointment_id: result.id, type: 'confirmation' },
       })
-      .catch(() => {})
+      .then(({ data }: any) => {
+        if (data && !data.success && data.whatsapp?.error) {
+          console.warn('[appointments] Confirmation notification issue:', data.whatsapp.error)
+        }
+      })
+      .catch((err: any) => {
+        console.error('[appointments] Failed to trigger confirmation notification:', String(err))
+      })
   }
 
   return { data: result as Appointment | null, error }

@@ -103,7 +103,14 @@ export async function createBooking(data: {
       .invoke('send-appointment-notification', {
         body: { appointment_id: result.appointment.id, type: 'confirmation' },
       })
-      .catch(() => {})
+      .then(({ data }: any) => {
+        if (data && !data.success && data.whatsapp?.error) {
+          console.warn('[public-booking] Confirmation notification issue:', data.whatsapp.error)
+        }
+      })
+      .catch((err: any) => {
+        console.error('[public-booking] Failed to trigger confirmation notification:', String(err))
+      })
   }
   return { data: result, error }
 }

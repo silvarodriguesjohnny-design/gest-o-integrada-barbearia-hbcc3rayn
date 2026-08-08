@@ -118,6 +118,8 @@ Deno.serve(async (req: Request) => {
         tenant_id,
         channel: 'whatsapp_manual',
         body: `Enviado para ${customer_name || phone}: ${message.slice(0, 150)}`,
+        status: 'sent',
+        notification_type: 'manual',
         sent_at: new Date().toISOString(),
       })
     } catch (logErr) {
