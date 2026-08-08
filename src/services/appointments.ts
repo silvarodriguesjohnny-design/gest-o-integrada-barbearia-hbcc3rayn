@@ -176,7 +176,7 @@ export async function markNoShow(
   if (data) {
     db.functions
       .invoke('send-appointment-notification', {
-        body: { appointment_id: id, type: 'no_show' },
+        body: { appointment_id: id, type: 'absence' },
       })
       .catch(() => {})
   }

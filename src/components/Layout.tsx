@@ -23,6 +23,7 @@ import {
   Settings,
   Crown,
   MessageCircle,
+  MessageSquare,
   UserPlus,
 } from 'lucide-react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -47,6 +48,7 @@ const NAV_ITEMS = [
   { name: 'Barbeiros', path: '/barbeiros', icon: Scissors },
   { name: 'Financeiro', path: '/financeiro', icon: DollarSign },
   { name: 'Campanhas', path: '/campanhas', icon: Gift },
+  { name: 'Mensagens', path: '/mensagens', icon: MessageSquare },
   { name: 'Configurações', path: '/settings', icon: Settings },
 ]
 

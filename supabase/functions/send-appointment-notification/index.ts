@@ -1,6 +1,11 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { sendWhatsAppMessage, getWhatsAppConfig, normalizePhone } from '../_shared/evolution-api.ts'
+import {
+  sendWhatsAppMessage,
+  getWhatsAppConfig,
+  normalizePhone,
+  validateWhatsAppConfig,
+} from '../_shared/evolution-api.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,12 +17,19 @@ const corsHeaders = {
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  const supabase = createClient(supabaseUrl, serviceRoleKey)
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+  )
 
   try {
     const { appointment_id, type = 'confirmation' } = await req.json()
+    console.log(
+      '[send-appointment-notification] Processing appointment:',
+      appointment_id,
+      'type:',
+      type,
+    )
 
     const { data: appt, error: apptError } = await supabase
       .from('appointments')
@@ -28,6 +40,7 @@ Deno.serve(async (req: Request) => {
       .single()
 
     if (apptError || !appt) {
+      console.error('[send-appointment-notification] Appointment not found:', apptError?.message)
       return new Response(JSON.stringify({ error: 'Agendamento não encontrado.' }), {
         status: 404,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
@@ -39,7 +52,6 @@ Deno.serve(async (req: Request) => {
       .select('channel')
       .eq('tenant_id', appt.tenant_id)
       .eq('is_active', true)
-
     let channels = (configs || []).map((c: any) => c.channel)
     if (channels.length === 0) channels = ['email']
 
@@ -52,33 +64,43 @@ Deno.serve(async (req: Request) => {
     }
     const body = messages[type] || messages.confirmation
 
+    console.log(
+      '[send-appointment-notification] Loading WhatsApp config for tenant:',
+      appt.tenant_id,
+    )
     const waConfig = await getWhatsAppConfig(supabase, appt.tenant_id)
-    let waResult: { success: boolean; error?: string; wa_me?: string } | null = null
+    const valErr = validateWhatsAppConfig(waConfig)
+    let waResult: { success: boolean; error?: string; details?: any; wa_me?: string } | null = null
 
-    if (waConfig && appt.customer?.phone) {
-      const phone = normalizePhone(appt.customer.phone)
-      const result = await sendWhatsAppMessage(waConfig, phone, body)
-      waResult = {
-        ...result,
-        wa_me: `https://wa.me/${phone}?text=${encodeURIComponent(body)}`,
+    if (valErr) {
+      console.error('[send-appointment-notification] Config validation failed:', valErr)
+      if (appt.customer?.phone) {
+        const phone = normalizePhone(appt.customer.phone)
+        waResult = {
+          success: false,
+          error: valErr,
+          wa_me: `https://wa.me/${phone}?text=${encodeURIComponent(body)}`,
+        }
       }
     } else if (appt.customer?.phone) {
       const phone = normalizePhone(appt.customer.phone)
-      waResult = {
-        success: false,
-        error: 'WhatsApp não configurado — usando wa.me como fallback',
-        wa_me: `https://wa.me/${phone}?text=${encodeURIComponent(body)}`,
-      }
+      console.log('[send-appointment-notification] Sending to:', phone)
+      const result = await sendWhatsAppMessage(waConfig!, phone, body)
+      waResult = { ...result, wa_me: `https://wa.me/${phone}?text=${encodeURIComponent(body)}` }
+      if (!result.success)
+        console.error('[send-appointment-notification] Send failed:', result.error)
     }
 
     for (const channel of channels) {
-      await supabase.from('notification_logs').insert({
-        tenant_id: appt.tenant_id,
-        appointment_id: appt.id,
-        channel,
-        body,
-        sent_at: new Date().toISOString(),
-      })
+      await supabase
+        .from('notification_logs')
+        .insert({
+          tenant_id: appt.tenant_id,
+          appointment_id: appt.id,
+          channel,
+          body,
+          sent_at: new Date().toISOString(),
+        })
     }
 
     return new Response(
@@ -86,6 +108,7 @@ Deno.serve(async (req: Request) => {
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } },
     )
   } catch (err) {
+    console.error('[send-appointment-notification] Internal error:', String(err))
     return new Response(JSON.stringify({ error: 'Erro interno', detail: String(err) }), {
       status: 500,
       headers: { 'Content-Type': 'application/json', ...corsHeaders },

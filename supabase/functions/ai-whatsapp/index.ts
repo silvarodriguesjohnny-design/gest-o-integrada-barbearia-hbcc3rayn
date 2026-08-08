@@ -1,5 +1,11 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
-import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { createClient } from 'npm:@supabase/supabase-js@2'
+import {
+  getWhatsAppConfig,
+  sendWhatsAppMessage,
+  normalizePhone,
+  validateWhatsAppConfig,
+} from '../_shared/evolution-api.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,6 +41,8 @@ Deno.serve(async (req: Request) => {
       })
     }
 
+    console.log('[ai-whatsapp] Received from:', phone, 'message:', message.slice(0, 100))
+
     let { data: customer } = await supabase
       .from('customers')
       .select('*')
@@ -43,11 +51,12 @@ Deno.serve(async (req: Request) => {
       .maybeSingle()
 
     if (!customer) {
-      const { data: newCustomer } = await supabase
+      const { data: newCustomer, error: createErr } = await supabase
         .from('customers')
         .insert({ name: `Cliente WhatsApp ${phone.slice(-4)}`, phone, tenant_id: tenantId || null })
         .select('*')
         .single()
+      if (createErr) console.error('[ai-whatsapp] Error creating customer:', createErr.message)
       customer = newCustomer
     }
 
@@ -77,11 +86,10 @@ Deno.serve(async (req: Request) => {
           (booked || []).map((a: any) => new Date(a.start_time).getHours()),
         )
         for (let h = 9; h < 18 && slots.length < 6; h++) {
-          if (!bookedHours.has(h)) {
+          if (!bookedHours.has(h))
             slots.push(
               `${date.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })} às ${String(h).padStart(2, '0')}:00`,
             )
-          }
         }
       }
       const svcList = (services || [])
@@ -89,7 +97,7 @@ Deno.serve(async (req: Request) => {
         .join('\n')
       responseText =
         slots.length > 0
-          ? `Olá ${customer?.name}! Serviços:\n${svcList}\n\nHorários disponíveis:\n${slots.join('\n')}\n\nResponda com o número do serviço e horário (ex: "1 ${slots[0]}").`
+          ? `Olá ${customer?.name}! Serviços:\n${svcList}\n\nHorários disponíveis:\n${slots.join('\n')}\n\nResponda com o número do serviço e horário.`
           : `Olá ${customer?.name}! Não há horários disponíveis. Agende pelo link: ${FRONTEND_URL}/book/${tid}`
     } else if (message.includes('servico') || message.includes('preco')) {
       const { data: services } = await supabase
@@ -115,15 +123,17 @@ Deno.serve(async (req: Request) => {
         start.setDate(start.getDate() + 1)
         start.setHours(10, 0, 0, 0)
         const end = new Date(start.getTime() + svc.duration_minutes * 60000)
-        const { error } = await supabase.from('appointments').insert({
-          customer_id: customer?.id,
-          service_id: svc.id,
-          barber_name: 'A definir',
-          status: 'scheduled',
-          start_time: start.toISOString(),
-          end_time: end.toISOString(),
-          tenant_id: tid,
-        })
+        const { error } = await supabase
+          .from('appointments')
+          .insert({
+            customer_id: customer?.id,
+            service_id: svc.id,
+            barber_name: 'A definir',
+            status: 'scheduled',
+            start_time: start.toISOString(),
+            end_time: end.toISOString(),
+            tenant_id: tid,
+          })
         responseText = error
           ? `Erro ao agendar. Tente pelo link: ${FRONTEND_URL}/book/${tid}`
           : `✅ Agendado!\nServiço: ${svc.name}\nData: ${start.toLocaleString('pt-BR')}`
@@ -134,13 +144,36 @@ Deno.serve(async (req: Request) => {
       responseText = `Olá ${customer?.name}! Posso ajudar:\n• "agendar" - marcar horário\n• "serviços" - ver preços\n• "link" - agendamento online`
     }
 
+    let waSent = false
+    let waError: string | undefined
+    if (tid) {
+      console.log('[ai-whatsapp] Loading WhatsApp config for tenant:', tid)
+      const waConfig = await getWhatsAppConfig(supabase, tid)
+      const valErr = validateWhatsAppConfig(waConfig)
+      if (valErr) {
+        console.warn('[ai-whatsapp] WhatsApp config not available:', valErr)
+        waError = valErr
+      } else {
+        const result = await sendWhatsAppMessage(waConfig!, normalizePhone(phone), responseText)
+        waSent = result.success
+        waError = result.error
+        if (!result.success) console.error('[ai-whatsapp] Failed to send reply:', result.error)
+        else console.log('[ai-whatsapp] Reply sent successfully')
+      }
+    }
+
     return new Response(
-      JSON.stringify({ success: true, response: responseText, customer_id: customer?.id }),
-      {
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      },
+      JSON.stringify({
+        success: true,
+        response: responseText,
+        customer_id: customer?.id,
+        whatsapp_sent: waSent,
+        whatsapp_error: waError,
+      }),
+      { headers: { 'Content-Type': 'application/json', ...corsHeaders } },
     )
   } catch (err) {
+    console.error('[ai-whatsapp] Internal error:', String(err))
     return new Response(JSON.stringify({ error: 'Internal error', detail: String(err) }), {
       status: 500,
       headers: { 'Content-Type': 'application/json', ...corsHeaders },

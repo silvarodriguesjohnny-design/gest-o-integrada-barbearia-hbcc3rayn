@@ -14,6 +14,7 @@ import Agenda from './pages/Agenda'
 import Financeiro from './pages/Financeiro'
 import Campanhas from './pages/Campanhas'
 import Settings from './pages/Settings'
+import EnvioManual from './pages/EnvioManual'
 import SuperAdmin from './pages/SuperAdmin'
 import UserManagement from './pages/UserManagement'
 import SetPassword from './pages/SetPassword'
@@ -77,6 +78,7 @@ const App = () => (
             <Route path="/agenda" element={<Agenda />} />
             <Route path="/financeiro" element={<Financeiro />} />
             <Route path="/campanhas" element={<Campanhas />} />
+            <Route path="/mensagens" element={<EnvioManual />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
           <Route

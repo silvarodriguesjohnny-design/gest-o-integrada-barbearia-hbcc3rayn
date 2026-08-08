@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,9 +9,11 @@ import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
 import { getMessagingConfigs, upsertMessagingConfig, testMessaging } from '@/services/messaging'
 
+const DRAFT_KEY = 'messaging-config-draft'
+
 const CHANNEL_FIELDS: Record<
   string,
-  { key: string; label: string; type?: string; optional?: boolean }[]
+  { key: string; label: string; type?: string; optional?: boolean; placeholder?: string }[]
 > = {
   email: [
     { key: 'smtp_host', label: 'SMTP Host' },
@@ -22,9 +24,13 @@ const CHANNEL_FIELDS: Record<
     { key: 'sender_email', label: 'Email do Remetente' },
   ],
   whatsapp: [
-    { key: 'evolution_base_url', label: 'Evolution API URL' },
-    { key: 'evolution_instance', label: 'Nome da Instância' },
-    { key: 'api_key', label: 'API Key (Evolution)', type: 'password' },
+    {
+      key: 'base_url',
+      label: 'URL da Instância',
+      placeholder: 'https://evolution-api-railway-production-bf12.up.railway.app',
+    },
+    { key: 'instance_name', label: 'Nome da Instância', placeholder: 'minha-instancia' },
+    { key: 'api_key', label: 'API Key', type: 'password' },
     { key: 'phone_number', label: 'Número (WhatsApp Business)' },
     { key: 'webhook_url', label: 'Webhook URL (opcional)', optional: true },
   ],
@@ -40,12 +46,38 @@ const CHANNEL_ICONS: Record<string, typeof Mail> = {
   sms: Smartphone,
 }
 
+function loadDraft(): Record<string, { active: boolean; fields: Record<string, string> }> | null {
+  try {
+    const stored = localStorage.getItem(DRAFT_KEY)
+    return stored ? JSON.parse(stored) : null
+  } catch {
+    return null
+  }
+}
+
+function saveDraft(configs: Record<string, { active: boolean; fields: Record<string, string> }>) {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(configs))
+  } catch {
+    // ignore
+  }
+}
+
+function clearDraft() {
+  try {
+    localStorage.removeItem(DRAFT_KEY)
+  } catch {
+    // ignore
+  }
+}
+
 export function CommunicationChannels() {
   const { tenant, profile } = useAuth()
   const { toast } = useToast()
+  const draftRef = useRef(loadDraft())
   const [configs, setConfigs] = useState<
     Record<string, { active: boolean; fields: Record<string, string> }>
-  >({})
+  >(draftRef.current || {})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
   const [testing, setTesting] = useState<string | null>(null)
@@ -62,10 +94,23 @@ export function CommunicationChannels() {
           fields: (found?.config_json as Record<string, string>) || {},
         }
       }
-      setConfigs(map)
+      if (draftRef.current) {
+        setConfigs((prev) => ({
+          ...map,
+          ...prev,
+        }))
+      } else {
+        setConfigs(map)
+      }
       setLoading(false)
     })
   }, [tenant])
+
+  useEffect(() => {
+    if (Object.keys(configs).length > 0) {
+      saveDraft(configs)
+    }
+  }, [configs])
 
   const updateField = (channel: string, key: string, value: string) => {
     setConfigs((prev) => ({
@@ -95,8 +140,13 @@ export function CommunicationChannels() {
     setSaving(channel)
     const { error } = await upsertMessagingConfig(tenant.id, channel, cfg.fields, cfg.active)
     setSaving(null)
-    if (error) toast({ title: 'Erro', description: error.message, variant: 'destructive' })
-    else toast({ title: `Configuração de ${channel} salva!` })
+    if (error) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' })
+    } else {
+      toast({ title: `Configuração de ${channel} salva!` })
+      draftRef.current = null
+      clearDraft()
+    }
   }
 
   const handleTest = async (channel: string) => {
@@ -104,18 +154,23 @@ export function CommunicationChannels() {
     const cfg = configs[channel]
     if (!cfg) return
     setTesting(channel)
-    const { data, error } = await testMessaging(
-      channel,
-      { ...cfg.fields, recipient: profile?.email || '' },
-      tenant.id,
-    )
+    const recipient = channel === 'whatsapp' ? cfg.fields.phone_number || '' : profile?.email || ''
+    const { data, error } = await testMessaging(channel, { ...cfg.fields, recipient }, tenant.id)
     setTesting(null)
-    if (error) toast({ title: 'Erro no teste', description: error.message, variant: 'destructive' })
-    else
+    if (error) {
+      toast({ title: 'Erro no teste', description: error.message, variant: 'destructive' })
+    } else if (data?.success === false) {
+      toast({
+        title: 'Falha no teste',
+        description: data?.error || 'Não foi possível enviar a mensagem.',
+        variant: 'destructive',
+      })
+    } else {
       toast({
         title: 'Teste enviado!',
         description: data?.message || 'Verifique seu email/telefone.',
       })
+    }
   }
 
   if (loading) {
@@ -151,11 +206,15 @@ export function CommunicationChannels() {
               <div className="grid grid-cols-2 gap-3">
                 {CHANNEL_FIELDS[channel].map((field) => (
                   <div key={field.key} className="space-y-1">
-                    <Label className="text-sm">{field.label}</Label>
+                    <Label className="text-sm">
+                      {field.label}
+                      {!field.optional && <span className="text-destructive ml-0.5">*</span>}
+                    </Label>
                     <Input
                       type={field.type || 'text'}
                       value={cfg.fields[field.key] || ''}
                       onChange={(e) => updateField(channel, field.key, e.target.value)}
+                      placeholder={field.placeholder}
                     />
                   </div>
                 ))}
