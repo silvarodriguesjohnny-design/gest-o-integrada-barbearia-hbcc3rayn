@@ -1,6 +1,13 @@
-import { useState, useEffect, useMemo } from 'react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import React, { useState, useEffect } from 'react'
+import { useAuth } from '@/hooks/use-auth'
+import { getCustomers } from '@/services/customers'
+import { sendManualWhatsAppMessage } from '@/services/whatsapp'
+import { Customer } from '@/types'
+import { formatPhone } from '@/lib/masks'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -9,200 +16,308 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Loader2, Send, MessageSquare, AlertTriangle, Phone } from 'lucide-react'
-import { getCustomers } from '@/services/customers'
-import { sendManualMessage, type ManualMessageType } from '@/services/manual-message'
-import { useToast } from '@/hooks/use-toast'
-import { useAuth } from '@/hooks/use-auth'
-import { cn } from '@/lib/utils'
-import type { CustomerWithDetails } from '@/types'
-
-const MESSAGE_TYPES: { value: ManualMessageType; label: string; description: string }[] = [
-  { value: 'ausencia', label: 'Ausência', description: 'Aviso de não comparecimento' },
-  { value: 'campanha', label: 'Campanha', description: 'Mensagem promocional' },
-  {
-    value: 'confirmacao',
-    label: 'Confirmação de Agendamento',
-    description: 'Confirma agendamento',
-  },
-  { value: 'teste', label: 'Teste', description: 'Mensagem de teste' },
-]
-
-function buildMessage(type: ManualMessageType, customerName: string): string {
-  switch (type) {
-    case 'ausencia':
-      return `⚠️ *Aviso de Ausência*\n\nOlá ${customerName}!\nNotamos que você não compareceu ao seu último agendamento.\nEntre em contato para remarcar!`
-    case 'campanha':
-      return `🎉 *Campanha Promocional*\n\nOlá ${customerName}!\nTemos uma oferta especial para você! Aproveite condições únicas em nossos serviços.\nAgende já o seu horário!`
-    case 'confirmacao':
-      return `✅ *Confirmação de Agendamento*\n\nOlá ${customerName}!\nSeu agendamento foi confirmado.\nEstamos te esperando!`
-    case 'teste':
-      return `🧪 *Mensagem de Teste*\n\nOlá ${customerName}!\nEste é um teste do sistema de mensagens.\nSe você recebeu esta mensagem, a configuração está funcionando!`
-  }
-}
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { toast } from 'sonner'
+import {
+  Send,
+  Loader2,
+  Phone,
+  User,
+  AlertTriangle,
+  CheckCircle2,
+  MessageSquare,
+  Sparkles,
+} from 'lucide-react'
 
 export default function EnvioManual() {
-  const { tenant } = useAuth()
-  const { toast } = useToast()
-  const [customers, setCustomers] = useState<CustomerWithDetails[]>([])
-  const [loading, setLoading] = useState(true)
-  const [sending, setSending] = useState(false)
-  const [selectedCustomerId, setSelectedCustomerId] = useState('')
-  const [messageType, setMessageType] = useState<ManualMessageType>('teste')
+  const { profile } = useAuth()
+  const tenantId = profile?.tenant_id
+
+  const [customers, setCustomers] = useState<Customer[]>([])
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('custom')
+  const [customerName, setCustomerName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [errorAlert, setErrorAlert] = useState<string | null>(null)
+  const [lastSuccessMsg, setLastSuccessMsg] = useState<string | null>(null)
 
   useEffect(() => {
-    getCustomers().then(({ data, error }) => {
-      if (error) toast({ title: 'Erro', description: error.message, variant: 'destructive' })
-      else setCustomers(data || [])
-      setLoading(false)
+    if (!tenantId) return
+    getCustomers(tenantId).then(({ data }) => {
+      if (data) setCustomers(data)
     })
-  }, [])
+  }, [tenantId])
 
-  const selectedCustomer = useMemo(
-    () => customers.find((c) => c.id === selectedCustomerId),
-    [customers, selectedCustomerId],
-  )
-
-  const messagePreview = useMemo(
-    () => (selectedCustomer ? buildMessage(messageType, selectedCustomer.name) : ''),
-    [messageType, selectedCustomer],
-  )
-
-  const handleSend = async () => {
-    if (!tenant || !selectedCustomer) return
-    if (!selectedCustomer.phone) {
-      toast({
-        title: 'Cliente sem telefone',
-        description: 'O cliente selecionado não possui número de telefone.',
-        variant: 'destructive',
-      })
+  const handleSelectCustomer = (val: string) => {
+    setSelectedCustomerId(val)
+    setErrorAlert(null)
+    setLastSuccessMsg(null)
+    if (val === 'custom') {
+      setCustomerName('')
+      setPhone('')
       return
     }
-    setSending(true)
-    const { data, error } = await sendManualMessage(tenant.id, selectedCustomer.id, messageType)
-    setSending(false)
-    if (error) {
-      toast({
-        title: 'Erro ao enviar',
-        description: error.message || 'Falha no envio.',
-        variant: 'destructive',
-      })
-    } else if (data?.error) {
-      toast({
-        title: 'Falha no envio',
-        description: data.error,
-        variant: 'destructive',
-      })
-    } else if (data?.success === false) {
-      toast({
-        title: 'Falha no envio',
-        description: data?.error || 'Não foi possível enviar a mensagem.',
-        variant: 'destructive',
-      })
-    } else {
-      toast({
-        title: 'Mensagem enviada!',
-        description: data?.message || 'WhatsApp enviado com sucesso.',
-      })
+    const cust = customers.find((c) => c.id === val)
+    if (cust) {
+      setCustomerName(cust.name)
+      setPhone(cust.phone ? formatPhone(cust.phone) : '')
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-accent" />
-      </div>
-    )
+  const handlePhoneChange = (val: string) => {
+    setPhone(formatPhone(val))
+    setErrorAlert(null)
+  }
+
+  const getSanitizedPreview = (num: string) => {
+    let digits = num.replace(/\D/g, '')
+    if (digits.startsWith('0') && (digits.length === 11 || digits.length === 12)) {
+      digits = digits.replace(/^0+/, '')
+    }
+    if (digits.length === 10 || digits.length === 11) {
+      return `55${digits}`
+    }
+    return digits
+  }
+
+  const sanitizedDigits = getSanitizedPreview(phone)
+
+  const handleApplyTemplate = (tmpl: string) => {
+    const nameToUse = customerName || 'Cliente'
+    const text = tmpl.replace(/\{nome\}/g, nameToUse)
+    setMessage(text)
+  }
+
+  const handleInsertVariable = (varName: string) => {
+    setMessage((prev) => `${prev} ${varName}`)
+  }
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!tenantId) {
+      toast.error('Sessão expirada ou barbearia não identificada.')
+      return
+    }
+    if (!phone || phone.replace(/\D/g, '').length < 10) {
+      toast.error('Informe um número de telefone válido com DDD (mínimo 10 dígitos).')
+      return
+    }
+    if (!message.trim()) {
+      toast.error('Digite a mensagem a ser enviada.')
+      return
+    }
+
+    setLoading(true)
+    setErrorAlert(null)
+    setLastSuccessMsg(null)
+
+    try {
+      const { data, error } = await sendManualWhatsAppMessage(
+        tenantId,
+        phone,
+        message,
+        customerName || 'Cliente',
+        selectedCustomerId !== 'custom' ? selectedCustomerId : undefined,
+      )
+
+      if (error || (data && !data.success)) {
+        const errorMsg =
+          data?.error || error?.message || 'Falha ao enviar mensagem. Verifique a integração.'
+        setErrorAlert(errorMsg)
+        toast.error('Falha no envio da mensagem', {
+          description: errorMsg,
+        })
+      } else {
+        const successText = `Mensagem enviada com sucesso para ${customerName || phone}!`
+        setLastSuccessMsg(successText)
+        toast.success(successText)
+        setMessage('')
+      }
+    } catch (err) {
+      const msg = `Erro inesperado: ${String(err)}`
+      setErrorAlert(msg)
+      toast.error(msg)
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
-    <div className="space-y-6 animate-fade-in-up max-w-2xl">
+    <div className="container max-w-4xl py-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Envio Manual de Mensagem</h1>
-        <p className="text-muted-foreground mt-1">
-          Envie mensagens via WhatsApp para seus clientes.
+        <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center gap-2">
+          <MessageSquare className="h-6 w-6 text-primary" /> Envio Manual de Mensagens
+        </h1>
+        <p className="text-sm text-muted-foreground mt-1">
+          Envie avisos e lembretes para seus clientes via WhatsApp com formatação automática e
+          tratamento de erros.
         </p>
       </div>
 
-      <Card className="hover:shadow-elevation transition-shadow">
-        <CardHeader className="bg-muted/20 border-b pb-4">
-          <CardTitle className="flex items-center gap-2 font-serif text-xl">
-            <MessageSquare className="h-5 w-5 text-accent" /> Nova Mensagem
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Send className="h-5 w-5 text-primary" />
+            Nova Mensagem WhatsApp
           </CardTitle>
-          <CardDescription>Selecione um cliente e o tipo de mensagem.</CardDescription>
+          <CardDescription>
+            Selecione um cliente da base ou digite o número manualmente.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6 pt-6">
-          <div className="space-y-2">
-            <Label className="font-semibold">Cliente</Label>
-            <Select value={selectedCustomerId} onValueChange={setSelectedCustomerId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione um cliente..." />
-              </SelectTrigger>
-              <SelectContent>
-                {customers.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name} {c.phone ? `— ${c.phone}` : '(sem telefone)'}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedCustomer && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Phone className="h-3.5 w-3.5" />
-                {selectedCustomer.phone || 'Sem telefone cadastrado'}
-              </div>
+        <CardContent>
+          <form onSubmit={handleSend} className="space-y-5">
+            {errorAlert && (
+              <Alert
+                variant="destructive"
+                className="border-red-500 bg-red-50 dark:bg-red-950/20 text-red-900 dark:text-red-200"
+              >
+                <AlertTriangle className="h-4 w-4 text-red-600" />
+                <AlertTitle className="font-semibold">Falha no envio</AlertTitle>
+                <AlertDescription className="text-sm mt-1">{errorAlert}</AlertDescription>
+              </Alert>
             )}
-          </div>
 
-          <div className="space-y-2">
-            <Label className="font-semibold">Tipo de Mensagem</Label>
-            <div className="grid grid-cols-2 gap-3">
-              {MESSAGE_TYPES.map((mt) => (
-                <button
-                  key={mt.value}
-                  onClick={() => setMessageType(mt.value)}
-                  className={cn(
-                    'text-left p-3 rounded-lg border-2 transition-all',
-                    messageType === mt.value
-                      ? 'border-accent bg-accent/5'
-                      : 'border-border hover:border-accent/50',
-                  )}
-                >
-                  <div className="font-semibold text-sm">{mt.label}</div>
-                  <div className="text-xs text-muted-foreground">{mt.description}</div>
-                </button>
-              ))}
+            {lastSuccessMsg && (
+              <Alert className="border-green-500 bg-green-50 dark:bg-green-950/20 text-green-800 dark:text-green-300">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <AlertTitle className="font-semibold">Sucesso!</AlertTitle>
+                <AlertDescription className="text-sm mt-1">{lastSuccessMsg}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="customer-select" className="flex items-center gap-1.5">
+                  <User className="h-4 w-4 text-muted-foreground" /> Selecionar Cliente
+                </Label>
+                <Select value={selectedCustomerId} onValueChange={handleSelectCustomer}>
+                  <SelectTrigger id="customer-select">
+                    <SelectValue placeholder="Escolha um cliente..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="custom">-- Digitar manualmente --</SelectItem>
+                    {customers.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name} {c.phone ? `(${formatPhone(c.phone)})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="customer-name">Nome do Destinatário</Label>
+                <Input
+                  id="customer-name"
+                  placeholder="Ex: João Silva"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                />
+              </div>
             </div>
-          </div>
 
-          {messagePreview && (
             <div className="space-y-2">
-              <Label className="font-semibold">Pré-visualização</Label>
-              <div className="rounded-lg border bg-muted/30 p-4 text-sm whitespace-pre-wrap font-mono">
-                {messagePreview}
+              <Label htmlFor="phone" className="flex items-center gap-1.5">
+                <Phone className="h-4 w-4 text-muted-foreground" /> Telefone / WhatsApp
+              </Label>
+              <Input
+                id="phone"
+                placeholder="(11) 99548-2267"
+                value={phone}
+                onChange={(e) => handlePhoneChange(e.target.value)}
+              />
+              {sanitizedDigits && (
+                <div className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
+                  <span>Destino formatado (DDI + DDD + Número):</span>
+                  <Badge variant="outline" className="font-mono text-xs text-primary">
+                    +{sanitizedDigits}
+                  </Badge>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="message">Conteúdo da Mensagem</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs h-7 px-2"
+                  onClick={() => handleInsertVariable('{nome}')}
+                >
+                  + {'{nome}'}
+                </Button>
+              </div>
+              <Textarea
+                id="message"
+                rows={4}
+                placeholder="Olá {nome}! Tudo bem? Passando para confirmar seu agendamento..."
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                <Sparkles className="h-3.5 w-3.5" /> Modelos Rápidos
+              </Label>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    handleApplyTemplate(
+                      'Olá {nome}! Tudo bem? Passando para lembrar do seu agendamento conosco. Qualquer dúvida estamos à disposição!',
+                    )
+                  }
+                >
+                  Lembrete
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    handleApplyTemplate(
+                      'Olá {nome}! Agradecemos a visita de hoje! Esperamos que tenha gostado do atendimento. Conte sempre conosco!',
+                    )
+                  }
+                >
+                  Agradecimento
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    handleApplyTemplate(
+                      'Olá {nome}! Sentimos sua falta! Que tal agendar um novo corte para esta semana?',
+                    )
+                  }
+                >
+                  Retorno
+                </Button>
               </div>
             </div>
-          )}
 
-          {selectedCustomer && !selectedCustomer.phone && (
-            <div className="flex items-center gap-2 text-sm text-destructive">
-              <AlertTriangle className="h-4 w-4" />
-              Este cliente não possui telefone. O envio será bloqueado.
-            </div>
-          )}
-
-          <Button
-            onClick={handleSend}
-            disabled={sending || !selectedCustomer || !selectedCustomer.phone}
-            className="bg-accent hover:bg-accent/90 text-white"
-          >
-            {sending ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4 mr-2" />
-            )}
-            {sending ? 'Enviando...' : 'Enviar'}
-          </Button>
+            <Button type="submit" disabled={loading} className="w-full md:w-auto min-w-[180px]">
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Enviando...
+                </>
+              ) : (
+                <>
+                  <Send className="mr-2 h-4 w-4" />
+                  Enviar via WhatsApp
+                </>
+              )}
+            </Button>
+          </form>
         </CardContent>
       </Card>
     </div>

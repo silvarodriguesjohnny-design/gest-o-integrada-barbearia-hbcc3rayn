@@ -31,3 +31,22 @@ export async function triggerReminderNotifications(): Promise<{ data: any; error
   })
   return { data, error }
 }
+
+export async function sendManualWhatsAppMessage(
+  tenantId: string,
+  phone: string,
+  message: string,
+  customerName?: string,
+  customerId?: string,
+): Promise<{ data: any; error: any }> {
+  const { data, error } = await supabase.functions.invoke('send-manual-message', {
+    body: {
+      tenant_id: tenantId,
+      phone,
+      message,
+      customer_name: customerName,
+      customer_id: customerId,
+    },
+  })
+  return { data, error }
+}
