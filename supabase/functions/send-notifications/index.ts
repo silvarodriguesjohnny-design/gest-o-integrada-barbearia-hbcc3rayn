@@ -144,7 +144,7 @@ Deno.serve(async (req: Request) => {
         .select('id')
         .eq('appointment_id', appointmentId)
         .eq('channel', channel)
-        .eq('status', 'sent')
+        .in('status', ['sent', 'pending'])
         .limit(1)
       if (error) {
         console.error(
@@ -170,43 +170,118 @@ Deno.serve(async (req: Request) => {
         '| phone:',
         appt.customer?.phone,
       )
-      const { waSent, error } = await trySendWa(appt.tenant_id, appt.customer?.phone, msg)
-      console.log(
-        '[send-notifications] STEP LOG: Logging to notification_logs — appointment_id:',
-        appt.id,
-        '| channel:',
-        channel,
-        '| status:',
-        waSent ? 'sent' : 'failed',
-        '| tenant_id:',
-        appt.tenant_id,
-      )
-      const { error: logError } = await supabase.from('notification_logs').insert({
-        tenant_id: appt.tenant_id,
-        appointment_id: appt.id,
-        channel,
-        body: msg,
-        status: waSent ? 'sent' : 'failed',
-        notification_type: notifType,
-        sent_at: new Date().toISOString(),
-      })
-      if (logError) {
+
+      // Atomically claim the notification slot (race-safe dedup via unique partial index)
+      const { data: claim, error: claimError } = await supabase
+        .from('notification_logs')
+        .insert({
+          tenant_id: appt.tenant_id,
+          appointment_id: appt.id,
+          channel,
+          body: msg,
+          status: 'pending',
+          notification_type: notifType,
+          sent_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single()
+
+      if (claimError) {
+        if (claimError.code === '23505') {
+          console.log(
+            '[send-notifications] DUPLICATE BLOCKED: Race condition — another process already claimed slot for appointment:',
+            appt.id,
+            '| channel:',
+            channel,
+            '| type:',
+            notifType,
+          )
+          notifications.push({
+            type: notifType,
+            customer: appt.customer?.name,
+            phone: appt.customer?.phone,
+            tenant_id: appt.tenant_id,
+            whatsapp_sent: false,
+            duplicate: true,
+            message: 'Skipped — duplicate notification blocked',
+          })
+          return
+        }
         console.error(
-          '[send-notifications] STEP LOG FAILED: Error logging notification:',
-          logError.message,
+          '[send-notifications] Error claiming notification slot:',
+          claimError.message,
           '| appointment:',
           appt.id,
           '| channel:',
           channel,
         )
-      } else {
-        console.log(
-          '[send-notifications] STEP LOG SUCCESS: notification_logs insert OK — appointment:',
-          appt.id,
-          '| status:',
-          waSent ? 'sent' : 'failed',
-        )
       }
+
+      const logId = claim?.id
+      const { waSent, error } = await trySendWa(appt.tenant_id, appt.customer?.phone, msg)
+      const logStatus = waSent ? 'sent' : 'failed'
+      console.log(
+        '[send-notifications] STEP LOG: Updating notification_logs — appointment_id:',
+        appt.id,
+        '| channel:',
+        channel,
+        '| status:',
+        logStatus,
+        '| tenant_id:',
+        appt.tenant_id,
+      )
+
+      if (logId) {
+        const { error: updateError } = await supabase
+          .from('notification_logs')
+          .update({ status: logStatus })
+          .eq('id', logId)
+        if (updateError) {
+          console.error(
+            '[send-notifications] STEP LOG FAILED: Error updating notification:',
+            updateError.message,
+            '| appointment:',
+            appt.id,
+            '| channel:',
+            channel,
+          )
+        } else {
+          console.log(
+            '[send-notifications] STEP LOG SUCCESS: notification_logs updated — appointment:',
+            appt.id,
+            '| status:',
+            logStatus,
+          )
+        }
+      } else {
+        const { error: logError } = await supabase.from('notification_logs').insert({
+          tenant_id: appt.tenant_id,
+          appointment_id: appt.id,
+          channel,
+          body: msg,
+          status: logStatus,
+          notification_type: notifType,
+          sent_at: new Date().toISOString(),
+        })
+        if (logError) {
+          console.error(
+            '[send-notifications] STEP LOG FAILED: Error logging notification:',
+            logError.message,
+            '| appointment:',
+            appt.id,
+            '| channel:',
+            channel,
+          )
+        } else {
+          console.log(
+            '[send-notifications] STEP LOG SUCCESS: notification_logs insert OK — appointment:',
+            appt.id,
+            '| status:',
+            logStatus,
+          )
+        }
+      }
+
       notifications.push({
         type: notifType,
         customer: appt.customer?.name,

@@ -123,17 +123,15 @@ Deno.serve(async (req: Request) => {
         start.setDate(start.getDate() + 1)
         start.setHours(10, 0, 0, 0)
         const end = new Date(start.getTime() + svc.duration_minutes * 60000)
-        const { error } = await supabase
-          .from('appointments')
-          .insert({
-            customer_id: customer?.id,
-            service_id: svc.id,
-            barber_name: 'A definir',
-            status: 'scheduled',
-            start_time: start.toISOString(),
-            end_time: end.toISOString(),
-            tenant_id: tid,
-          })
+        const { error } = await supabase.from('appointments').insert({
+          customer_id: customer?.id,
+          service_id: svc.id,
+          barber_name: 'A definir',
+          status: 'scheduled',
+          start_time: start.toISOString(),
+          end_time: end.toISOString(),
+          tenant_id: tid,
+        })
         responseText = error
           ? `Erro ao agendar. Tente pelo link: ${FRONTEND_URL}/book/${tid}`
           : `✅ Agendado!\nServiço: ${svc.name}\nData: ${start.toLocaleString('pt-BR')}`

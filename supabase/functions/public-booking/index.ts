@@ -46,7 +46,6 @@ Deno.serve(async (req: Request) => {
 
     if (action === 'get_slots') {
       const { tenant_id, date } = body
-      const [year, month, day] = date.split('-').map(Number)
 
       const prevDay = new Date(`${date}T00:00:00-03:00`)
       prevDay.setUTCDate(prevDay.getUTCDate() - 1)
@@ -219,190 +218,36 @@ Deno.serve(async (req: Request) => {
 
       if (error) throw error
 
-      // --- Direct server-side WhatsApp confirmation (no browser dependency) ---
+      // --- Single notification path: invoke send-appointment-notification edge function ---
+      // The inline WhatsApp send was removed to eliminate duplicate notifications.
+      // All notification logic (including race-safe deduplication) lives in
+      // send-appointment-notification, which is the sole sender for confirmations.
       try {
+        const fnUrl = `${supabaseUrl}/functions/v1/send-appointment-notification`
         console.log(
-          '[public-booking] STEP 1: Loading full appointment data for appointment:',
+          '[public-booking] Triggering confirmation notification for appointment:',
           appointment.id,
         )
-        const { data: fullAppt, error: fullApptError } = await supabase
-          .from('appointments')
-          .select(
-            '*, customer:customers(name, phone, email), service:services(name, price, duration_minutes), tenant:tenants(name)',
-          )
-          .eq('id', appointment.id)
-          .single()
-
-        if (fullApptError) {
-          console.error(
-            '[public-booking] STEP 1 FAILED: Error loading full appointment:',
-            fullApptError.message,
-            '| code:',
-            fullApptError.code,
-            '| details:',
-            JSON.stringify(fullApptError),
-          )
-        }
+        const notifResp = await fetch(fnUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({ appointment_id: appointment.id, type: 'confirmation' }),
+        })
+        const notifData = await notifResp.json()
         console.log(
-          '[public-booking] STEP 1 RESULT: fullAppt loaded:',
-          !!fullAppt,
-          '| customer:',
-          fullAppt?.customer?.name,
-          '| phone:',
-          fullAppt?.customer?.phone,
-          '| service:',
-          fullAppt?.service?.name,
-          '| tenant:',
-          fullAppt?.tenant?.name,
+          '[public-booking] Confirmation notification result:',
+          JSON.stringify({
+            success: notifData.success,
+            duplicate: notifData.duplicate,
+            type: notifData.type,
+          }),
         )
-
-        if (fullAppt) {
-          console.log('[public-booking] STEP 2: Checking for existing confirmation logs')
-          const { data: existingLogs, error: existingLogsError } = await supabase
-            .from('notification_logs')
-            .select('id, status')
-            .eq('appointment_id', appointment.id)
-            .eq('channel', 'whatsapp')
-            .eq('notification_type', 'confirmation')
-            .eq('status', 'sent')
-            .limit(1)
-
-          if (existingLogsError) {
-            console.error(
-              '[public-booking] STEP 2 WARNING: Error checking existing logs:',
-              existingLogsError.message,
-            )
-          }
-          console.log(
-            '[public-booking] STEP 2 RESULT: existing sent confirmations:',
-            existingLogs?.length || 0,
-          )
-
-          if (!existingLogs || existingLogs.length === 0) {
-            const dateStr = formatBrasiliaDateTime(fullAppt.start_time)
-            const body =
-              `✅ *Confirmação*\n\nOlá ${fullAppt.customer?.name}!\n` +
-              `Seu agendamento foi confirmado:\n` +
-              `• Serviço: ${fullAppt.service?.name}\n` +
-              `• Barbeiro: ${fullAppt.barber_name || 'A definir'}\n` +
-              `• Data/Hora: ${dateStr}\n\n${fullAppt.tenant?.name}`
-
-            console.log(
-              '[public-booking] STEP 3: Reading WhatsApp config from messaging_configs for tenant:',
-              tenant_id,
-            )
-            const waConfig = await getWhatsAppConfig(supabase, tenant_id)
-            console.log(
-              '[public-booking] STEP 3 RESULT: config loaded:',
-              !!waConfig,
-              '| base_url:',
-              waConfig?.base_url ? `(set, length=${waConfig.base_url.length})` : '(MISSING)',
-              '| instance_name:',
-              waConfig?.instance_name ? `"${waConfig.instance_name}"` : '(MISSING)',
-              '| api_key:',
-              waConfig?.api_key ? `(set, length=${waConfig.api_key.length})` : '(MISSING)',
-            )
-
-            console.log('[public-booking] STEP 4: Validating WhatsApp config')
-            const valErr = validateWhatsAppConfig(waConfig)
-            console.log(
-              '[public-booking] STEP 4 RESULT: validation:',
-              valErr ? `FAILED — ${valErr}` : 'PASSED',
-            )
-
-            let logStatus = 'failed'
-            let logBody = body
-
-            if (valErr) {
-              console.error(
-                '[public-booking] STEP 4 FAILED: WhatsApp config validation failed:',
-                valErr,
-              )
-              logBody = `[FALHA CONFIG] ${valErr}\n\n${body}`
-            } else if (!fullAppt.customer?.phone) {
-              console.error(
-                '[public-booking] STEP 5 SKIPPED: Customer has no phone number registered — cannot send WhatsApp',
-              )
-              logBody = `[FALHA] Cliente não possui telefone cadastrado.\n\n${body}`
-            } else {
-              console.log(
-                '[public-booking] STEP 5: Calling Evolution API sendWhatsAppMessage — target:',
-                fullAppt.customer.phone,
-                '| message length:',
-                body.length,
-              )
-              const result = await sendWhatsAppMessage(waConfig!, fullAppt.customer.phone, body)
-              console.log(
-                '[public-booking] STEP 5 RESULT: sendWhatsAppMessage returned:',
-                result.success ? 'SUCCESS' : 'FAILED',
-                result.error ? `| error: ${result.error}` : '',
-                result.details ? `| details: ${JSON.stringify(result.details)}` : '',
-              )
-
-              if (result.success) {
-                logStatus = 'sent'
-                console.log(
-                  '[public-booking] STEP 5 SUCCESS: WhatsApp confirmation sent successfully to:',
-                  fullAppt.customer.phone,
-                )
-              } else {
-                logBody = `[FALHA ENVIO] ${result.error}\n\n${body}`
-                console.error('[public-booking] STEP 5 FAILED: WhatsApp send failed:', result.error)
-                if (result.details) {
-                  console.error(
-                    '[public-booking] STEP 5 ERROR DETAILS:',
-                    JSON.stringify(result.details),
-                  )
-                }
-              }
-            }
-
-            console.log(
-              '[public-booking] STEP 6: Logging notification to notification_logs — appointment_id:',
-              appointment.id,
-              '| status:',
-              logStatus,
-              '| channel: whatsapp',
-            )
-            const { error: logError } = await supabase.from('notification_logs').insert({
-              tenant_id,
-              appointment_id: appointment.id,
-              channel: 'whatsapp',
-              body: logBody,
-              status: logStatus,
-              notification_type: 'confirmation',
-              sent_at: new Date().toISOString(),
-            })
-
-            if (logError) {
-              console.error(
-                '[public-booking] STEP 6 CRITICAL: Failed to log notification:',
-                logError.message,
-                '| code:',
-                logError.code,
-                '| details:',
-                JSON.stringify(logError),
-              )
-            } else {
-              console.log(
-                '[public-booking] STEP 6 RESULT: notification_logs insert SUCCESSFUL — status:',
-                logStatus,
-                '| appointment_id:',
-                appointment.id,
-              )
-            }
-          } else {
-            console.log('[public-booking] STEP 2: Confirmation already sent successfully, skipping')
-          }
-        } else {
-          console.error(
-            '[public-booking] STEP 1 FAILED: fullAppt is null — cannot send confirmation. This may indicate a PostgREST join error or RLS issue. Error:',
-            fullApptError ? JSON.stringify(fullApptError) : 'unknown',
-          )
-        }
       } catch (notifyErr) {
         console.error(
-          '[public-booking] CRITICAL: Confirmation notification error:',
+          '[public-booking] Error triggering confirmation notification:',
           String(notifyErr),
           '| stack:',
           (notifyErr as Error)?.stack,

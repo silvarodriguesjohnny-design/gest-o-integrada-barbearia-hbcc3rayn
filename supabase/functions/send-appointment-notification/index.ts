@@ -31,13 +31,13 @@ Deno.serve(async (req: Request) => {
   try {
     const { appointment_id, type = 'confirmation' } = await req.json()
     console.log(
-      '[send-appointment-notification] STEP 1: Processing appointment:',
+      '[send-appointment-notification] Processing appointment:',
       appointment_id,
       '| type:',
       type,
     )
 
-    console.log('[send-appointment-notification] STEP 2: Loading appointment data with relations')
+    // --- Step 1: Load appointment data ---
     const { data: appt, error: apptError } = await supabase
       .from('appointments')
       .select(
@@ -48,7 +48,7 @@ Deno.serve(async (req: Request) => {
 
     if (apptError || !appt) {
       console.error(
-        '[send-appointment-notification] STEP 2 FAILED: Appointment not found:',
+        '[send-appointment-notification] Appointment not found:',
         apptError?.message,
         '| code:',
         apptError?.code,
@@ -60,7 +60,7 @@ Deno.serve(async (req: Request) => {
     }
 
     console.log(
-      '[send-appointment-notification] STEP 2 RESULT: Appointment loaded:',
+      '[send-appointment-notification] Appointment loaded:',
       '| id:',
       appt.id,
       '| tenant_id:',
@@ -75,46 +75,7 @@ Deno.serve(async (req: Request) => {
       appt.tenant?.name,
     )
 
-    if (type === 'confirmation') {
-      console.log(
-        '[send-appointment-notification] STEP 2b: Checking for existing sent confirmation (duplicate protection)',
-      )
-      const { data: existingLogs, error: existingLogsError } = await supabase
-        .from('notification_logs')
-        .select('id, status')
-        .eq('appointment_id', appointment_id)
-        .eq('channel', 'whatsapp')
-        .eq('notification_type', 'confirmation')
-        .eq('status', 'sent')
-        .limit(1)
-
-      if (existingLogsError) {
-        console.error(
-          '[send-appointment-notification] STEP 2b WARNING: Error checking existing logs:',
-          existingLogsError.message,
-        )
-      }
-
-      if (existingLogs && existingLogs.length > 0) {
-        console.log(
-          '[send-appointment-notification] STEP 2b: Confirmation already sent successfully for appointment:',
-          appointment_id,
-        )
-        return new Response(
-          JSON.stringify({
-            success: true,
-            message: 'Confirmação já foi enviada anteriormente para este agendamento.',
-            duplicate: true,
-            type,
-          }),
-          { headers: { 'Content-Type': 'application/json', ...corsHeaders } },
-        )
-      }
-      console.log(
-        '[send-appointment-notification] STEP 2b RESULT: No existing confirmation found — proceeding',
-      )
-    }
-
+    // --- Step 2: Build message (timezone-aware, DD/MM/YYYY, HH:MM, no seconds) ---
     const dateStr = formatBrasiliaDateTime(appt.start_time)
     const messages: Record<string, string> = {
       confirmation: `✅ *Confirmação*\n\nOlá ${appt.customer?.name}!\nSeu agendamento foi confirmado:\n• Serviço: ${appt.service?.name}\n• Barbeiro: ${appt.barber_name || 'A definir'}\n• Data/Hora: ${dateStr}\n\n${appt.tenant?.name}`,
@@ -124,26 +85,118 @@ Deno.serve(async (req: Request) => {
     }
     const body = messages[type] || messages.confirmation
 
+    // --- Step 3: Check for existing sent/pending notification (dedup check) ---
+    const { data: existingLogs, error: existingLogsError } = await supabase
+      .from('notification_logs')
+      .select('id, status')
+      .eq('appointment_id', appointment_id)
+      .eq('channel', 'whatsapp')
+      .eq('notification_type', type)
+      .in('status', ['sent', 'pending'])
+      .limit(1)
+
+    if (existingLogsError) {
+      console.error(
+        '[send-appointment-notification] Error checking existing logs:',
+        existingLogsError.message,
+      )
+    }
+
+    if (existingLogs && existingLogs.length > 0) {
+      console.log(
+        '[send-appointment-notification] DUPLICATE BLOCKED: Already sent/pending for appointment:',
+        appointment_id,
+        '| type:',
+        type,
+        '| existing status:',
+        existingLogs[0].status,
+      )
+      return new Response(
+        JSON.stringify({
+          success: true,
+          duplicate: true,
+          message: 'Notificação já enviada ou em processamento.',
+          type,
+        }),
+        { headers: { 'Content-Type': 'application/json', ...corsHeaders } },
+      )
+    }
+
+    // --- Step 4: Atomically claim the notification slot (race-safe dedup) ---
+    // Insert a 'pending' log. The unique partial index on
+    // (appointment_id, notification_type, channel) WHERE status IN ('sent', 'pending')
+    // ensures only one process can claim this slot, even under concurrency.
+    const { data: claim, error: claimError } = await supabase
+      .from('notification_logs')
+      .insert({
+        tenant_id: appt.tenant_id,
+        appointment_id: appt.id,
+        channel: 'whatsapp',
+        body: body,
+        status: 'pending',
+        notification_type: type,
+        sent_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single()
+
+    if (claimError) {
+      // 23505 = unique_violation — another process already claimed this slot
+      if (claimError.code === '23505') {
+        console.log(
+          '[send-appointment-notification] DUPLICATE BLOCKED: Race condition — another process claimed it first for appointment:',
+          appointment_id,
+          '| type:',
+          type,
+        )
+        return new Response(
+          JSON.stringify({
+            success: true,
+            duplicate: true,
+            message: 'Notificação já está sendo processada por outro processo.',
+            type,
+          }),
+          { headers: { 'Content-Type': 'application/json', ...corsHeaders } },
+        )
+      }
+      console.error(
+        '[send-appointment-notification] Error claiming notification slot:',
+        claimError.message,
+        '| code:',
+        claimError.code,
+      )
+    }
+
+    const logId = claim?.id
     console.log(
-      '[send-appointment-notification] STEP 3: Reading WhatsApp config from messaging_configs for tenant:',
+      '[send-appointment-notification] Claimed notification slot:',
+      logId,
+      '| appointment:',
+      appointment_id,
+      '| type:',
+      type,
+    )
+
+    // --- Step 5: Read and validate WhatsApp config ---
+    console.log(
+      '[send-appointment-notification] Reading WhatsApp config for tenant:',
       appt.tenant_id,
     )
     const waConfig = await getWhatsAppConfig(supabase, appt.tenant_id)
     console.log(
-      '[send-appointment-notification] STEP 3 RESULT: config loaded:',
+      '[send-appointment-notification] Config loaded:',
       !!waConfig,
       '| base_url:',
-      waConfig?.base_url ? `(set, length=${waConfig.base_url.length})` : '(MISSING)',
+      waConfig?.base_url ? '(set)' : '(MISSING)',
       '| instance_name:',
-      waConfig?.instance_name ? `"${waConfig.instance_name}"` : '(MISSING)',
+      waConfig?.instance_name || '(MISSING)',
       '| api_key:',
-      waConfig?.api_key ? `(set, length=${waConfig.api_key.length})` : '(MISSING)',
+      waConfig?.api_key ? '(set)' : '(MISSING)',
     )
 
-    console.log('[send-appointment-notification] STEP 4: Validating WhatsApp config')
     const valErr = validateWhatsAppConfig(waConfig)
     console.log(
-      '[send-appointment-notification] STEP 4 RESULT: validation:',
+      '[send-appointment-notification] Config validation:',
       valErr ? `FAILED — ${valErr}` : 'PASSED',
     )
 
@@ -155,32 +208,23 @@ Deno.serve(async (req: Request) => {
     let logBody = body
 
     if (valErr) {
-      console.error(
-        '[send-appointment-notification] STEP 4 FAILED: Config validation failed:',
-        valErr,
-      )
+      console.error('[send-appointment-notification] Config validation failed:', valErr)
       const missing = getMissingConfigFields(waConfig)
-      console.error(
-        '[send-appointment-notification] STEP 4 FAILED: Missing/invalid fields:',
-        missing.join(', '),
-      )
+      console.error('[send-appointment-notification] Missing/invalid fields:', missing.join(', '))
       waResult = { success: false, error: valErr }
       logBody = `[FALHA CONFIG] ${valErr}\n\n${body}`
       if (appt.customer?.phone) {
         waResult.wa_me = buildWaMeLink(appt.customer.phone, body)
-        console.log(
-          '[send-appointment-notification] STEP 4: wa.me fallback link generated:',
-          waResult.wa_me,
-        )
+        console.log('[send-appointment-notification] wa.me fallback link generated')
       }
     } else if (!appt.customer?.phone) {
       const noPhoneErr = 'Cliente não possui número de telefone cadastrado.'
-      console.error('[send-appointment-notification] STEP 5 SKIPPED:', noPhoneErr)
+      console.error('[send-appointment-notification] SKIPPED:', noPhoneErr)
       waResult = { success: false, error: noPhoneErr }
       logBody = `[FALHA] ${noPhoneErr}\n\n${body}`
     } else {
       console.log(
-        '[send-appointment-notification] STEP 5: Calling Evolution API sendWhatsAppMessage — target:',
+        '[send-appointment-notification] Calling Evolution API — target:',
         appt.customer.phone,
         '| message length:',
         body.length,
@@ -188,7 +232,7 @@ Deno.serve(async (req: Request) => {
       const result = await sendWhatsAppMessage(waConfig!, appt.customer.phone, body)
       waResult = { ...result, wa_me: buildWaMeLink(appt.customer.phone, body) }
       console.log(
-        '[send-appointment-notification] STEP 5 RESULT: sendWhatsAppMessage returned:',
+        '[send-appointment-notification] Send result:',
         result.success ? 'SUCCESS' : 'FAILED',
         result.error ? `| error: ${result.error}` : '',
         result.details ? `| details: ${JSON.stringify(result.details)}` : '',
@@ -197,69 +241,57 @@ Deno.serve(async (req: Request) => {
       if (result.success) {
         logStatus = 'sent'
         console.log(
-          '[send-appointment-notification] STEP 5 SUCCESS: Message sent successfully to:',
+          '[send-appointment-notification] Message sent successfully to:',
           appt.customer.phone,
         )
       } else {
         const friendlyError = result.error || 'Falha desconhecida ao enviar mensagem.'
         logBody = `[FALHA ENVIO] ${friendlyError}\n\n${body}`
-        console.error('[send-appointment-notification] STEP 5 FAILED: Send failed:', friendlyError)
-        if (result.details) {
-          console.error(
-            '[send-appointment-notification] STEP 5 ERROR DETAILS:',
-            JSON.stringify(result.details),
-          )
-        }
+        console.error('[send-appointment-notification] Send failed:', friendlyError)
       }
     }
 
-    console.log(
-      '[send-appointment-notification] STEP 6: Logging to notification_logs:',
-      '| appointment_id:',
-      appt.id,
-      '| status:',
-      logStatus,
-      '| tenant_id:',
-      appt.tenant_id,
-      '| channel: whatsapp',
-      '| notification_type:',
-      type,
-    )
-    const { error: logError } = await supabase.from('notification_logs').insert({
-      tenant_id: appt.tenant_id,
-      appointment_id: appt.id,
-      channel: 'whatsapp',
-      body: logBody,
-      status: logStatus,
-      notification_type: type,
-      sent_at: new Date().toISOString(),
-    })
-
-    if (logError) {
-      console.error(
-        '[send-appointment-notification] STEP 6 CRITICAL: Failed to log notification:',
-        logError.message,
-        '| code:',
-        logError.code,
-        '| details:',
-        JSON.stringify(logError),
-      )
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: `Falha crítica ao registrar log de notificação: ${logError.message}`,
-          type,
-          body,
-          whatsapp: waResult,
-        }),
-        { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } },
-      )
+    // --- Step 6: Update the log with final status ---
+    if (logId) {
+      const { error: updateError } = await supabase
+        .from('notification_logs')
+        .update({ status: logStatus, body: logBody })
+        .eq('id', logId)
+      if (updateError) {
+        console.error(
+          '[send-appointment-notification] Error updating log status:',
+          updateError.message,
+          '| code:',
+          updateError.code,
+        )
+      } else {
+        console.log(
+          '[send-appointment-notification] Log updated — id:',
+          logId,
+          '| status:',
+          logStatus,
+        )
+      }
+    } else {
+      // Fallback: insert a new log if the claim failed (e.g., unique index not yet created)
+      const { error: logError } = await supabase.from('notification_logs').insert({
+        tenant_id: appt.tenant_id,
+        appointment_id: appt.id,
+        channel: 'whatsapp',
+        body: logBody,
+        status: logStatus,
+        notification_type: type,
+        sent_at: new Date().toISOString(),
+      })
+      if (logError) {
+        console.error(
+          '[send-appointment-notification] Fallback log insert failed:',
+          logError.message,
+          '| code:',
+          logError.code,
+        )
+      }
     }
-
-    console.log(
-      '[send-appointment-notification] STEP 6 RESULT: notification_logs insert SUCCESSFUL — status:',
-      logStatus,
-    )
 
     return new Response(
       JSON.stringify({
@@ -272,7 +304,7 @@ Deno.serve(async (req: Request) => {
     )
   } catch (err) {
     console.error(
-      '[send-appointment-notification] CRITICAL: Internal error:',
+      '[send-appointment-notification] CRITICAL:',
       String(err),
       '| stack:',
       (err as Error)?.stack,
