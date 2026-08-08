@@ -160,3 +160,26 @@ export async function cancelAppointment(id: string, notify: boolean) {
   }
   return { data, error }
 }
+
+export async function markNoShow(
+  id: string,
+): Promise<{ data: AppointmentWithRelations | null; error: any }> {
+  const { data, error } = await db
+    .from('appointments')
+    .update({ status: 'cancelled' })
+    .eq('id', id)
+    .select(
+      '*, customer:customers(id, name, phone), service:services(id, name, price, duration_minutes)',
+    )
+    .single()
+
+  if (data) {
+    db.functions
+      .invoke('send-appointment-notification', {
+        body: { appointment_id: id, type: 'no_show' },
+      })
+      .catch(() => {})
+  }
+
+  return { data: data as AppointmentWithRelations | null, error }
+}

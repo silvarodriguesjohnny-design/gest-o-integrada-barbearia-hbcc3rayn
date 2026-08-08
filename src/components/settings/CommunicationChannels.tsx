@@ -22,7 +22,9 @@ const CHANNEL_FIELDS: Record<
     { key: 'sender_email', label: 'Email do Remetente' },
   ],
   whatsapp: [
-    { key: 'api_key', label: 'API Key', type: 'password' },
+    { key: 'evolution_base_url', label: 'Evolution API URL' },
+    { key: 'evolution_instance', label: 'Nome da Instância' },
+    { key: 'api_key', label: 'API Key (Evolution)', type: 'password' },
     { key: 'phone_number', label: 'Número (WhatsApp Business)' },
     { key: 'webhook_url', label: 'Webhook URL (opcional)', optional: true },
   ],
