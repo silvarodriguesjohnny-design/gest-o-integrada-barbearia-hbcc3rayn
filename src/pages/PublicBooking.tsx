@@ -104,7 +104,8 @@ export default function PublicBooking() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
+      <div className="relative flex items-center justify-center min-h-screen bg-background bg-[radial-gradient(ellipse_at_top,_rgba(217,119,6,0.08),_transparent_50%)]">
+        <div className="absolute top-0 left-0 right-0 h-1 barber-pole-stripes" />
         <Loader2 className="h-8 w-8 animate-spin text-accent" />
       </div>
     )
@@ -112,7 +113,8 @@ export default function PublicBooking() {
 
   if (done) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background p-6 text-center">
+      <div className="relative flex flex-col items-center justify-center min-h-screen bg-background bg-[radial-gradient(ellipse_at_top,_rgba(217,119,6,0.08),_transparent_50%)] p-6 text-center">
+        <div className="absolute top-0 left-0 right-0 h-1 barber-pole-stripes" />
         <CheckCircle2 className="h-16 w-16 text-emerald-500 mb-4 animate-bounce" />
         <h1 className="text-2xl font-bold">Agendamento Confirmado!</h1>
         <p className="text-muted-foreground mt-2">
@@ -146,7 +148,8 @@ export default function PublicBooking() {
     : []
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8">
+    <div className="relative min-h-screen bg-background bg-[radial-gradient(ellipse_at_top,_rgba(217,119,6,0.08),_transparent_50%)] p-4 md:p-8">
+      <div className="absolute top-0 left-0 right-0 h-1 barber-pole-stripes z-50" />
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center gap-3 border-b pb-4">
           {tenant?.logo_url ? (

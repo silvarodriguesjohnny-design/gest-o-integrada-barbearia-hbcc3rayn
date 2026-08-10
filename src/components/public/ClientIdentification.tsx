@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { UserPlus, UserCheck, Loader2 } from 'lucide-react'
+import { UserPlus, UserCheck, Loader2, Scissors } from 'lucide-react'
 import {
   identifyCustomer,
   createPublicCustomer,
@@ -59,7 +59,10 @@ export function ClientIdentification({ tenantId, onIdentified }: Props) {
   if (mode === 'choose') {
     return (
       <div className="grid gap-3">
-        <h2 className="text-lg font-semibold">Você já é cliente?</h2>
+        <div className="flex items-center gap-2">
+          <Scissors className="h-5 w-5 text-accent" />
+          <h2 className="text-lg font-semibold">Você já é cliente?</h2>
+        </div>
         <Card
           className="cursor-pointer hover:shadow-elevation transition-shadow"
           onClick={() => setMode('existing')}

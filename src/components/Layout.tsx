@@ -9,6 +9,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarTrigger,
+  SidebarFooter,
 } from '@/components/ui/sidebar'
 import {
   Bell,
@@ -66,7 +67,8 @@ export default function Layout() {
     <SidebarProvider>
       <div className="flex min-h-screen w-full bg-background">
         <Sidebar>
-          <SidebarHeader className="flex h-16 items-center border-b px-4">
+          <SidebarHeader className="relative flex h-16 items-center border-b px-4">
+            <div className="absolute top-0 left-0 right-0 h-1 barber-pole-stripes" />
             <div className="flex items-center gap-2 font-serif text-2xl font-bold text-primary">
               {tenant?.logo_url ? (
                 <img
@@ -117,9 +119,15 @@ export default function Layout() {
               </SidebarGroupContent>
             </SidebarGroup>
           </SidebarContent>
+          <SidebarFooter className="border-t border-sidebar-border p-3">
+            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground/50">
+              <Scissors className="h-3.5 w-3.5" />
+              <span className="font-serif">na régua</span>
+            </div>
+          </SidebarFooter>
         </Sidebar>
 
-        <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[radial-gradient(ellipse_at_top_right,_rgba(217,119,6,0.04),_transparent_400px)]">
           <header className="flex h-16 items-center justify-between border-b bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="flex items-center gap-4 flex-1">
               <SidebarTrigger className="md:hidden" />
