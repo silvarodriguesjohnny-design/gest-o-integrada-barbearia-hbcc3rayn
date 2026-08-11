@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Scissors, Clock, Loader2, CheckCircle2, Calendar, User, CalendarX } from 'lucide-react'
+import { Calendar } from '@/components/ui/calendar'
+import { Scissors, Clock, Loader2, CheckCircle2, CalendarDays, User, CalendarX } from 'lucide-react'
+import { ptBR } from 'date-fns/locale'
 import { useToast } from '@/hooks/use-toast'
 import { ClientIdentification } from '@/components/public/ClientIdentification'
 import {
@@ -13,10 +14,12 @@ import {
   createBooking,
   calculateSlotsWithSchedules,
   groupSlotsByPeriod,
+  fetchMonthRawData,
   type PublicService,
   type PublicCustomer,
   type PublicBarberSchedule,
   type SlotAppointment,
+  type MonthSlotData,
 } from '@/services/public-booking'
 import { formatLocalDateYYYYMMDD } from '@/lib/date-utils'
 import { cn } from '@/lib/utils'
@@ -39,6 +42,11 @@ export default function PublicBooking() {
   const [booking, setBooking] = useState(false)
   const [done, setDone] = useState(false)
 
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [rawMonthData, setRawMonthData] = useState<Map<string, MonthSlotData>>(new Map())
+  const [loadingMonth, setLoadingMonth] = useState(false)
+  const [availableDates, setAvailableDates] = useState<Set<string>>(new Set())
+
   useEffect(() => {
     if (!tenantId) return
     getTenantData(tenantId).then(({ data }) => {
@@ -49,6 +57,42 @@ export default function PublicBooking() {
       setLoading(false)
     })
   }, [tenantId])
+
+  useEffect(() => {
+    if (!tenantId || loading) return
+    setLoadingMonth(true)
+    const year = currentMonth.getFullYear()
+    const month = currentMonth.getMonth() + 1
+    fetchMonthRawData(tenantId, year, month)
+      .then((data) => {
+        setRawMonthData(data)
+        setLoadingMonth(false)
+      })
+      .catch(() => setLoadingMonth(false))
+  }, [tenantId, currentMonth, loading])
+
+  useEffect(() => {
+    if (!selectedService || rawMonthData.size === 0) {
+      setAvailableDates(new Set())
+      return
+    }
+    const available = new Set<string>()
+    for (const [dateStr, data] of rawMonthData) {
+      const [y, m, d] = dateStr.split('-').map(Number)
+      const targetDate = new Date(y, m - 1, d)
+      const slots = calculateSlotsWithSchedules(
+        data.appointments,
+        data.barber_schedules,
+        selectedBarber,
+        selectedService.duration_minutes,
+        targetDate,
+      )
+      if (slots.some((s) => s.available)) {
+        available.add(dateStr)
+      }
+    }
+    setAvailableDates(available)
+  }, [rawMonthData, selectedService, selectedBarber])
 
   useEffect(() => {
     if (!tenantId || !date) return
@@ -77,6 +121,12 @@ export default function PublicBooking() {
     }, 10000)
     return () => clearInterval(interval)
   }, [tenantId, date])
+
+  const selectedDateObj = useMemo(() => {
+    if (!date) return undefined
+    const [y, m, d] = date.split('-').map(Number)
+    return new Date(y, m - 1, d)
+  }, [date])
 
   const handleBook = async () => {
     if (!tenantId || !selectedService || !selectedSlot || !customer) return
@@ -239,16 +289,50 @@ export default function PublicBooking() {
               </div>
             )}
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label className="flex items-center gap-2 text-sm font-semibold">
-                <Calendar className="h-4 w-4" /> Data do Atendimento
+                <CalendarDays className="h-4 w-4" /> Data do Atendimento
               </Label>
-              <Input
-                type="date"
-                value={date}
-                min={formatLocalDateYYYYMMDD(new Date())}
-                onChange={(e) => setDate(e.target.value)}
-              />
+              <div className="relative">
+                {loadingMonth && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-card/80 backdrop-blur-sm rounded-lg">
+                    <Loader2 className="h-6 w-6 animate-spin text-accent" />
+                  </div>
+                )}
+                <Calendar
+                  mode="single"
+                  selected={selectedDateObj}
+                  onSelect={(selectedDate) => {
+                    if (selectedDate) setDate(formatLocalDateYYYYMMDD(selectedDate))
+                  }}
+                  disabled={(checkDate: Date) => {
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+                    if (checkDate < today) return true
+                    if (loadingMonth) return true
+                    const dateStr = formatLocalDateYYYYMMDD(checkDate)
+                    return !availableDates.has(dateStr)
+                  }}
+                  month={currentMonth}
+                  onMonthChange={setCurrentMonth}
+                  fromDate={new Date()}
+                  locale={ptBR}
+                  className="rounded-lg border border-border bg-card p-3 w-full"
+                  classNames={{
+                    day_selected:
+                      'bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground rounded-md font-bold',
+                    day_today: 'ring-2 ring-accent text-accent rounded-md',
+                    day_disabled: 'text-muted-foreground/30 line-through cursor-not-allowed',
+                    month: 'space-y-4 w-full',
+                    table: 'w-full',
+                  }}
+                />
+              </div>
+              {availableDates.size === 0 && !loadingMonth && selectedService && (
+                <p className="text-sm text-muted-foreground text-center">
+                  Nenhuma data disponível neste mês. Tente o próximo mês.
+                </p>
+              )}
             </div>
 
             {loadingSlots ? (

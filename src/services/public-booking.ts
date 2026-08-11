@@ -207,3 +207,50 @@ export function calculateSlotsWithSchedules(
 
   return slots
 }
+
+export interface MonthSlotData {
+  appointments: SlotAppointment[]
+  barbers: string[]
+  barber_schedules: PublicBarberSchedule[]
+}
+
+export async function fetchMonthRawData(
+  tenantId: string,
+  year: number,
+  month: number,
+): Promise<Map<string, MonthSlotData>> {
+  const result = new Map<string, MonthSlotData>()
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const lastDay = new Date(year, month, 0).getDate()
+  const dateStrings: string[] = []
+
+  for (let day = 1; day <= lastDay; day++) {
+    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    const [y, m, d] = dateStr.split('-').map(Number)
+    const checkDate = new Date(y, m - 1, d)
+    if (checkDate >= today) {
+      dateStrings.push(dateStr)
+    }
+  }
+
+  const responses = await Promise.allSettled(
+    dateStrings.map(async (ds) => {
+      const { data } = await getSlots(tenantId, ds)
+      return { date: ds, data }
+    }),
+  )
+
+  for (const response of responses) {
+    if (response.status === 'fulfilled' && response.value.data) {
+      result.set(response.value.date, {
+        appointments: response.value.data.appointments || [],
+        barbers: response.value.data.barbers || [],
+        barber_schedules: response.value.data.barber_schedules || [],
+      })
+    }
+  }
+
+  return result
+}
