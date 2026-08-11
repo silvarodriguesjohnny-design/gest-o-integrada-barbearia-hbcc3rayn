@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { Building2, Crown, TrendingUp, Users, Loader2, Clock } from 'lucide-react'
 import { getAllTenants, calculateMRR } from '@/services/super-admin'
 import { ManualTenantDialog } from '@/components/admin/ManualTenantDialog'
+import { PendingTenants } from '@/components/PendingTenants'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import { TenantEditDialog } from '@/components/admin/TenantEditDialog'
@@ -63,6 +64,7 @@ export default function SuperAdmin() {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
+      <PendingTenants />
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">

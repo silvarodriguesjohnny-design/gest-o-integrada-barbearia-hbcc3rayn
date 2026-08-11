@@ -34,15 +34,20 @@ export async function submitRegistration(data: Record<string, unknown>) {
   }
 
   try {
+    const emailBody = `Olá ${payload.full_name},\n\nRecebemos seu cadastro para a barbearia "${payload.nome_negocio}".\nSeu cadastro está em análise e você será notificado quando for aprovado.\n\nAtenciosamente,\nEquipe Na Régua`
+    const waMessage = `Olá ${payload.full_name}! Recebemos seu cadastro para a barbearia "${payload.nome_negocio}". Seu cadastro está em análise e você será notificado quando for aprovado. — Equipe Na Régua`
+
     await client.functions.invoke('send-email', {
       body: {
         to: payload.email,
         subject: 'Seu cadastro está em análise – Na Régua',
-        body: `Olá ${payload.full_name},\n\nRecebemos seu cadastro para a barbearia "${payload.nome_negocio}".\nSeu cadastro está em análise e você será notificado quando for aprovado.\n\nAtenciosamente,\nEquipe Na Régua`,
+        body: emailBody,
+        phone: payload.phone,
+        whatsapp_message: waMessage,
       },
     })
   } catch {
-    /* ignore email function failure so registration remains successful */
+    /* ignore notification failure so registration remains successful */
   }
 
   return { data: { success: true }, error: null }
@@ -63,6 +68,21 @@ export async function rejectPendingTenant(id: string) {
     .eq('id', id)
     .select()
     .single()
+
+  if (!error && data) {
+    try {
+      await supabase.functions.invoke('send-email', {
+        body: {
+          to: data.email,
+          subject: 'Atualização sobre seu cadastro – Na Régua',
+          body: `Olá ${data.full_name},\n\nAgradecemos seu interesse em se cadastrar no Na Régua.\n\nInfelizmente, não foi possível aprovar seu cadastro neste momento. Caso tenha dúvidas, entre em contato com nossa equipe.\n\nAtenciosamente,\nEquipe Na Régua`,
+        },
+      })
+    } catch {
+      /* ignore email failure */
+    }
+  }
+
   return { data, error }
 }
 

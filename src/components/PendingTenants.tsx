@@ -2,15 +2,17 @@ import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, Check, X, Clock } from 'lucide-react'
+import { Loader2, Check, X, Clock, Eye } from 'lucide-react'
 import { getPendingTenants, approveTenant, rejectPendingTenant } from '@/services/pending-tenants'
 import { useToast } from '@/hooks/use-toast'
 import type { PendingTenant } from '@/types'
+import { PendingTenantDetailDialog } from '@/components/admin/PendingTenantDetailDialog'
 
 export function PendingTenants({ refreshTrigger }: { refreshTrigger?: number }) {
   const [tenants, setTenants] = useState<PendingTenant[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const [detailTenant, setDetailTenant] = useState<PendingTenant | null>(null)
   const { toast } = useToast()
 
   const load = () => {
@@ -40,7 +42,9 @@ export function PendingTenants({ refreshTrigger }: { refreshTrigger?: number }) 
       const msg =
         data?.email_sent === false
           ? 'Barbearia aprovada, mas houve erro ao enviar email. O usuário pode redefinir a senha na página de login.'
-          : 'Barbearia aprovada! O usuário receberá um e-mail para definir sua senha.'
+          : data?.whatsapp_sent
+            ? 'Barbearia aprovada! O usuário receberá e-mail e WhatsApp com as instruções de acesso.'
+            : 'Barbearia aprovada! O usuário receberá um e-mail com as instruções de acesso.'
       toast({ title: 'Aprovado!', description: msg })
       load()
     }
@@ -92,6 +96,9 @@ export function PendingTenants({ refreshTrigger }: { refreshTrigger?: number }) 
               </div>
             </div>
             <div className="flex gap-2">
+              <Button size="sm" variant="ghost" onClick={() => setDetailTenant(t)}>
+                <Eye className="h-4 w-4 mr-1" /> Detalhes
+              </Button>
               <Button
                 size="sm"
                 className="bg-emerald-600 hover:bg-emerald-700 text-white"
@@ -117,6 +124,11 @@ export function PendingTenants({ refreshTrigger }: { refreshTrigger?: number }) 
           </div>
         ))}
       </div>
+      <PendingTenantDetailDialog
+        tenant={detailTenant}
+        open={!!detailTenant}
+        onOpenChange={(v) => !v && setDetailTenant(null)}
+      />
     </Card>
   )
 }
