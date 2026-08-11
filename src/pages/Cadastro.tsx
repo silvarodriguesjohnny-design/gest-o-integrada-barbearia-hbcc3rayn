@@ -61,13 +61,8 @@ export default function Cadastro() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const digits = form.cpf_cnpj.replace(/\D/g, '')
-    if (digits.length !== 11 && digits.length !== 14) {
-      toast({ title: 'CPF/CNPJ inválido', variant: 'destructive' })
-      return
-    }
-    if (!form.full_name || !form.email || !form.nome_negocio) {
-      toast({ title: 'Preencha os campos obrigatórios', variant: 'destructive' })
+    if (!form.full_name.trim() || !form.email.trim() || !form.nome_negocio.trim()) {
+      toast({ title: 'Preencha os campos obrigatórios (*)', variant: 'destructive' })
       return
     }
     setLoading(true)
@@ -78,8 +73,13 @@ export default function Cadastro() {
     })
     setLoading(false)
     if (error) {
-      toast({ title: 'Erro', description: error.message, variant: 'destructive' })
+      toast({
+        title: 'Erro ao enviar cadastro',
+        description: 'Tente novamente.',
+        variant: 'destructive',
+      })
     } else {
+      toast({ title: 'Cadastro enviado com sucesso!', description: 'Aguarde a aprovação.' })
       setDone(true)
     }
   }

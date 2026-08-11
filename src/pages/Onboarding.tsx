@@ -149,7 +149,7 @@ export default function Onboarding() {
       setErrors(foundErrors)
       toast({
         title: 'Verifique os campos',
-        description: 'Corrija os campos destacados.',
+        description: 'Preencha todos os campos obrigatórios (*).',
         variant: 'destructive',
       })
       return
@@ -176,16 +176,20 @@ export default function Onboarding() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-accent/5 p-4">
-        <Card className="w-full max-w-md text-center shadow-xl">
+      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] p-4">
+        <Card className="w-full max-w-md text-center shadow-2xl bg-[#121212] border-amber-500/20 text-slate-100">
           <CardHeader className="space-y-3">
-            <CheckCircle className="h-12 w-12 text-emerald-500 mx-auto" />
-            <CardTitle className="text-2xl">Cadastro enviado!</CardTitle>
-            <CardDescription>
-              Você receberá um e-mail quando sua conta for aprovada.
+            <CheckCircle className="h-14 w-14 text-emerald-500 mx-auto" />
+            <CardTitle className="text-2xl font-bold text-amber-500">Cadastro enviado!</CardTitle>
+            <CardDescription className="text-slate-300">
+              Sua barbearia foi cadastrada e está em análise. Você receberá uma confirmação por
+              e-mail assim que for aprovada.
             </CardDescription>
-            <Button onClick={() => navigate('/login')} className="w-full mt-4">
-              Voltar para o login
+            <Button
+              onClick={() => navigate('/')}
+              className="w-full mt-4 bg-amber-600 hover:bg-amber-700 text-white font-semibold"
+            >
+              Voltar ao Início
             </Button>
           </CardHeader>
         </Card>
@@ -194,21 +198,21 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-accent/5 p-4 py-8">
-      <Card className="w-full max-w-2xl mx-auto shadow-xl">
+    <div className="min-h-screen bg-[#0a0a0a] text-slate-100 p-4 py-8 flex items-center justify-center">
+      <Card className="w-full max-w-2xl mx-auto shadow-2xl bg-[#121212] border-amber-500/20 text-slate-100">
         <CardHeader className="space-y-3">
           <Link
             to="/"
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-accent"
+            className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-amber-500 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" /> Voltar
           </Link>
-          <div className="flex items-center gap-2 font-serif text-2xl font-bold text-primary">
-            <Scissors className="h-6 w-6 text-accent" />
-            <span className="text-accent">na régua</span>
+          <div className="flex items-center gap-2 font-serif text-2xl font-bold text-amber-500">
+            <Scissors className="h-6 w-6 text-amber-500" />
+            <span>na régua</span>
           </div>
-          <CardTitle>Cadastre sua barbearia</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-2xl font-bold text-white">Cadastre sua barbearia</CardTitle>
+          <CardDescription className="text-slate-400">
             Preencha os dados abaixo. Após aprovação, você receberá um e-mail para definir sua
             senha.
           </CardDescription>
@@ -356,7 +360,11 @@ export default function Onboarding() {
                 <Err msg={errors.horario_funcionamento} />
               </div>
             </div>
-            <Button type="submit" className="w-full h-12 text-base" disabled={loading}>
+            <Button
+              type="submit"
+              className="w-full h-12 text-base bg-amber-600 hover:bg-amber-700 text-white font-semibold"
+              disabled={loading}
+            >
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Enviar cadastro
             </Button>

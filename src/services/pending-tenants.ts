@@ -3,43 +3,49 @@ import { publicSupabase } from '@/lib/supabase/public-client'
 
 export async function submitRegistration(data: Record<string, unknown>) {
   const payload = {
-    full_name: data.full_name,
-    email: data.email,
-    phone: data.phone,
-    cpf_cnpj: data.cpf_cnpj,
-    cep: data.cep,
-    rua: data.rua,
-    numero: data.numero,
-    complemento: data.complemento,
-    bairro: data.bairro,
-    cidade: data.cidade,
-    estado: data.estado,
-    nome_negocio: data.nome_negocio,
-    numero_cadeiras: data.numero_cadeiras,
-    quantidade_profissionais: data.quantidade_profissionais,
-    horario_funcionamento: data.horario_funcionamento,
+    full_name: String(data.full_name || '').trim(),
+    email: String(data.email || '')
+      .trim()
+      .toLowerCase(),
+    phone: data.phone ? String(data.phone).trim() : null,
+    cpf_cnpj: data.cpf_cnpj ? String(data.cpf_cnpj).trim() : null,
+    cep: data.cep ? String(data.cep).trim() : null,
+    rua: data.rua ? String(data.rua).trim() : null,
+    numero: data.numero ? String(data.numero).trim() : null,
+    complemento: data.complemento ? String(data.complemento).trim() : null,
+    bairro: data.bairro ? String(data.bairro).trim() : null,
+    cidade: data.cidade ? String(data.cidade).trim() : null,
+    estado: data.estado ? String(data.estado).trim() : null,
+    nome_negocio: String(data.nome_negocio || '').trim(),
+    numero_cadeiras: Number(data.numero_cadeiras) || 1,
+    quantidade_profissionais: Number(data.quantidade_profissionais) || 1,
+    horario_funcionamento: data.horario_funcionamento
+      ? String(data.horario_funcionamento).trim()
+      : null,
     status: 'pending',
   }
 
-  const { data: result, error } = await publicSupabase
-    .from('pending_tenants')
-    .insert(payload)
-    .select()
-    .single()
+  const client = publicSupabase || supabase
+  const { error } = await client.from('pending_tenants').insert([payload])
 
-  if (error) return { data: null, error }
+  if (error) {
+    console.error('Error submitting tenant registration:', error)
+    return { data: null, error }
+  }
 
-  await publicSupabase.functions
-    .invoke('send-email', {
+  try {
+    await client.functions.invoke('send-email', {
       body: {
-        to: data.email as string,
+        to: payload.email,
         subject: 'Seu cadastro está em análise – Na Régua',
-        body: `Olá ${data.full_name},\n\nRecebemos seu cadastro para a barbearia "${data.nome_negocio}".\nSeu cadastro está em análise e você será notificado quando for aprovado.\n\nAtenciosamente,\nEquipe Na Régua`,
+        body: `Olá ${payload.full_name},\n\nRecebemos seu cadastro para a barbearia "${payload.nome_negocio}".\nSeu cadastro está em análise e você será notificado quando for aprovado.\n\nAtenciosamente,\nEquipe Na Régua`,
       },
     })
-    .catch(() => {})
+  } catch {
+    /* ignore email function failure so registration remains successful */
+  }
 
-  return { data: result, error: null }
+  return { data: { success: true }, error: null }
 }
 
 export async function getPendingTenants() {

@@ -63,6 +63,7 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/book/:tenantId" element={<PublicBooking />} />
           <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/cadastro" element={<Onboarding />} />
           <Route path="/trial-expired" element={<TrialExpired />} />
           <Route path="/set-password" element={<SetPassword />} />
           <Route
