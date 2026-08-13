@@ -101,6 +101,45 @@ export async function createBooking(data: {
   return { data: result, error }
 }
 
+export interface AppointmentConfirmationData {
+  appointment: {
+    id: string
+    status: string
+    start_time: string
+    end_time: string
+    barber_name: string | null
+    confirmation_token: string | null
+    customer_name: string | null
+    service_name: string | null
+    tenant_name: string | null
+    tenant_logo_url: string | null
+  } | null
+  loyalty: {
+    stamps_count: number
+    is_reward_ready: boolean
+    target: number
+    remaining: number
+  } | null
+}
+
+// Public confirmation flow — uses the public (anon) client so unauthenticated
+// clients can load and confirm an appointment by its confirmation_token.
+export async function getAppointmentByToken(
+  token: string,
+): Promise<{ data: AppointmentConfirmationData | null; error: any }> {
+  const { data, error } = await supabase.functions.invoke('public-booking', {
+    body: { action: 'get_appointment_by_token', token },
+  })
+  return { data: data as AppointmentConfirmationData | null, error }
+}
+
+export async function confirmAppointmentByToken(token: string): Promise<{ data: any; error: any }> {
+  const { data, error } = await supabase.functions.invoke('public-booking', {
+    body: { action: 'confirm_appointment', token },
+  })
+  return { data, error }
+}
+
 export function groupSlotsByPeriod(slots: TimeSlot[]): { period: string; slots: TimeSlot[] }[] {
   const parse = (s: TimeSlot) => parseInt(s.time.split(':')[0], 10)
   const groups = [

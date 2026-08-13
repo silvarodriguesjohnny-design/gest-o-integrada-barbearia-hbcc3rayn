@@ -56,7 +56,7 @@ export async function createAppointment(data: {
   barber_name?: string
   start_time: string
   duration_minutes: number
-}): Promise<{ data: Appointment | null; error: any }> {
+}): Promise<{ data: Appointment | null; error: any; notification?: any }> {
   const start = new Date(data.start_time)
   const end = new Date(start.getTime() + data.duration_minutes * 60000)
 
@@ -89,6 +89,7 @@ export async function createAppointment(data: {
       status: 'scheduled',
       start_time: start.toISOString(),
       end_time: end.toISOString(),
+      confirmation_token: crypto.randomUUID(),
     })
     .select('*')
     .single()

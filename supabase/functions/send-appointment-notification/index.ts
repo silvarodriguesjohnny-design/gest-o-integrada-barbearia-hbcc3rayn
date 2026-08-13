@@ -77,8 +77,48 @@ Deno.serve(async (req: Request) => {
 
     // --- Step 2: Build message (timezone-aware, DD/MM/YYYY, HH:MM, no seconds) ---
     const dateStr = formatBrasiliaDateTime(appt.start_time)
+    const tenantName = appt.tenant?.name || 'Barbearia'
+    const customerName = appt.customer?.name || 'cliente'
+    const serviceName = appt.service?.name || 'serviço'
+
+    // Confirmation includes a confirmation link (confirmation_token) + loyalty
+    // summary. The link points to the app's public /confirmar/:token route.
+    const APP_BASE_URL = 'https://gestao-integrada-barbearia-a3c26.goskip.app'
+    let confirmationBody = ''
+    if (type === 'confirmation') {
+      const confirmUrl = appt.confirmation_token
+        ? `${APP_BASE_URL}/confirmar/${appt.confirmation_token}`
+        : `${APP_BASE_URL}`
+
+      // Loyalty summary (may not exist yet -> 0 stamps). Only stamp when
+      // appointment reaches 'completed', so confirmation never awards a stamp.
+      let stamps = 0
+      try {
+        const { data: loyalty } = await supabase
+          .from('loyalty_cards')
+          .select('stamps_count')
+          .eq('customer_id', appt.customer_id)
+          .maybeSingle()
+        stamps = loyalty?.stamps_count ?? 0
+      } catch (e) {
+        console.warn('[send-appointment-notification] Could not load loyalty card:', String(e))
+      }
+      const remaining = Math.max(0, 12 - stamps)
+
+      confirmationBody =
+        `✂️ *Agendamento Confirmado — ${tenantName}*\n\n` +
+        `Olá *${customerName}*! Seu horário está reservado:\n\n` +
+        `📅 *Data/Hora:* ${dateStr}\n` +
+        `💈 *Serviço:* ${serviceName}\n\n` +
+        `Toque no link abaixo para *confirmar sua presença*:\n` +
+        `👉 ${confirmUrl}\n\n` +
+        `---\n\n` +
+        `🎁 *Fidelidade:* A cada visita concluída você ganha um carimbo! Com 12 carimbos, o próximo corte é por nossa conta. Você tem *${stamps}* carimbo(s) — faltam *${remaining}* para a recompensa!\n\n` +
+        `Se precisar reagendar, é só avisar. Até lá! 💈`
+    }
+
     const messages: Record<string, string> = {
-      confirmation: `✅ *Confirmação*\n\nOlá ${appt.customer?.name}!\nSeu agendamento foi confirmado:\n• Serviço: ${appt.service?.name}\n• Barbeiro: ${appt.barber_name || 'A definir'}\n• Data/Hora: ${dateStr}\n\n${appt.tenant?.name}`,
+      confirmation: confirmationBody,
       reminder: `⏰ *Lembrete*\n\nOlá ${appt.customer?.name}!\nVocê tem um agendamento para ${appt.service?.name} em ${dateStr}.\n\n${appt.tenant?.name}`,
       cancellation: `❌ *Cancelamento*\n\nOlá ${appt.customer?.name}!\nSeu agendamento de ${appt.service?.name} em ${dateStr} foi cancelado.\nPara remarcar, acesse nosso site.\n\n${appt.tenant?.name}`,
       absence: `⚠️ *Aviso de Ausência*\n\nOlá ${appt.customer?.name}!\nNotamos que você não compareceu ao agendamento de ${appt.service?.name} em ${dateStr}.\nEntre em contato para remarcar!\n\n${appt.tenant?.name}`,

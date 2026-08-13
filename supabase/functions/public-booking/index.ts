@@ -212,6 +212,7 @@ Deno.serve(async (req: Request) => {
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
           status: 'scheduled',
+          confirmation_token: crypto.randomUUID(),
         })
         .select()
         .single()
@@ -255,6 +256,120 @@ Deno.serve(async (req: Request) => {
       }
 
       return new Response(JSON.stringify({ appointment }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (action === 'get_appointment_by_token') {
+      const { token } = body
+      if (!token) {
+        return new Response(JSON.stringify({ error: 'Token não informado.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // Fetch the appointment + relations by confirmation_token. This call uses
+      // the service role key, so it bypasses RLS. The public page itself also
+      // queries via the anon client (RLS allows select by token), but the
+      // service-role fetch here is the canonical source for the page payload.
+      const { data: appt, error: apptError } = await supabase
+        .from('appointments')
+        .select(
+          'id, status, start_time, end_time, barber_name, confirmation_token, tenant_id, customer:customers(id, name), service:services(id, name, duration_minutes), tenant:tenants(id, name, logo_url)',
+        )
+        .eq('confirmation_token', token)
+        .maybeSingle()
+
+      if (apptError) throw apptError
+      if (!appt) {
+        return new Response(JSON.stringify({ appointment: null }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // Loyalty summary for the customer (may not exist yet -> 0 stamps)
+      const { data: loyalty } = await supabase
+        .from('loyalty_cards')
+        .select('stamps_count, is_reward_ready')
+        .eq('customer_id', appt.customer?.id)
+        .maybeSingle()
+
+      return new Response(
+        JSON.stringify({
+          appointment: {
+            id: appt.id,
+            status: appt.status,
+            start_time: appt.start_time,
+            end_time: appt.end_time,
+            barber_name: appt.barber_name,
+            confirmation_token: appt.confirmation_token,
+            customer_name: appt.customer?.name || null,
+            service_name: appt.service?.name || null,
+            tenant_name: appt.tenant?.name || null,
+            tenant_logo_url: appt.tenant?.logo_url || null,
+          },
+          loyalty: {
+            stamps_count: loyalty?.stamps_count ?? 0,
+            is_reward_ready: loyalty?.is_reward_ready ?? false,
+            target: 12,
+            remaining: Math.max(0, 12 - (loyalty?.stamps_count ?? 0)),
+          },
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
+    if (action === 'confirm_appointment') {
+      const { token } = body
+      if (!token) {
+        return new Response(JSON.stringify({ error: 'Token não informado.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // Load current appointment to validate state
+      const { data: appt, error: apptError } = await supabase
+        .from('appointments')
+        .select('id, status, confirmation_token')
+        .eq('confirmation_token', token)
+        .maybeSingle()
+
+      if (apptError) throw apptError
+      if (!appt) {
+        return new Response(JSON.stringify({ error: 'Agendamento não encontrado.' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (appt.status === 'confirmed') {
+        return new Response(JSON.stringify({ already_confirmed: true, appointment: appt }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (appt.status !== 'scheduled') {
+        return new Response(
+          JSON.stringify({
+            error: `Não é possível confirmar: status atual é "${appt.status}".`,
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        )
+      }
+
+      const { data: updated, error: updateError } = await supabase
+        .from('appointments')
+        .update({ status: 'confirmed' })
+        .eq('id', appt.id)
+        .eq('status', 'scheduled')
+        .select('id, status')
+        .single()
+
+      if (updateError) throw updateError
+
+      return new Response(JSON.stringify({ success: true, appointment: updated }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }

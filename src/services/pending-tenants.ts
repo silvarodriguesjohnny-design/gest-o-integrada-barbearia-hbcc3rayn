@@ -26,7 +26,11 @@ export async function submitRegistration(data: Record<string, unknown>) {
   }
 
   const client = publicSupabase || supabase
-  const { error } = await client.from('pending_tenants').insert([payload])
+  const { data: inserted, error } = await client
+    .from('pending_tenants')
+    .insert([payload])
+    .select('id')
+    .single()
 
   if (error) {
     console.error('Error submitting tenant registration:', error)
@@ -50,7 +54,7 @@ export async function submitRegistration(data: Record<string, unknown>) {
     /* ignore notification failure so registration remains successful */
   }
 
-  return { data: { success: true }, error: null }
+  return { data: { success: true, id: inserted?.id }, error: null }
 }
 
 export async function getPendingTenants() {
@@ -90,17 +94,56 @@ export async function approveTenant(pendingTenantId: string) {
   const { data, error } = await supabase.functions.invoke('approve-tenant', {
     body: { pending_tenant_id: pendingTenantId },
   })
-  return { data, error }
+
+  if (error) {
+    let message = error.message
+    try {
+      if ('context' in error && error.context) {
+        const res = (error as any).context as Response
+        const body = await res.clone().json()
+        if (body?.error) {
+          message = body.error + (body.details ? `: ${body.details}` : '')
+        }
+      }
+    } catch {
+      /* fallback */
+    }
+    return { data: null, error: new Error(message) }
+  }
+
+  return { data, error: null }
 }
 
-export async function createTenantDirect(data: {
-  full_name: string
-  email: string
-  phone?: string
-  nome_negocio: string
-}) {
+export async function createTenantDirect(data: Record<string, unknown>) {
+  const regResult = await submitRegistration(data)
+  if (regResult.error) {
+    return { data: null, error: regResult.error }
+  }
+
+  const pendingId = regResult.data?.id
+  if (pendingId) {
+    return await approveTenant(pendingId)
+  }
+
   const { data: result, error } = await supabase.functions.invoke('approve-tenant', {
     body: { ...data },
   })
-  return { data: result, error }
+
+  if (error) {
+    let message = error.message
+    try {
+      if ('context' in error && error.context) {
+        const res = (error as any).context as Response
+        const body = await res.clone().json()
+        if (body?.error) {
+          message = body.error + (body.details ? `: ${body.details}` : '')
+        }
+      }
+    } catch {
+      /* fallback */
+    }
+    return { data: null, error: new Error(message) }
+  }
+
+  return { data: result, error: null }
 }

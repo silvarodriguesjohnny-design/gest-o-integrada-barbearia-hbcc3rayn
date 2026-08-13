@@ -1,7 +1,9 @@
 import { db } from './db'
 import type { Customer, CustomerWithDetails, LoyaltyCard } from '@/types'
 
-export async function getCustomers(): Promise<{ data: CustomerWithDetails[] | null; error: any }> {
+export async function getCustomers(
+  _tenantId?: string,
+): Promise<{ data: CustomerWithDetails[] | null; error: any }> {
   const [custRes, loyaltyRes, apptRes] = await Promise.all([
     db.from('customers').select('*').order('name'),
     db.from('loyalty_cards').select('*'),

@@ -13,6 +13,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Search, Star, Loader2, Plus, ChevronUp, ChevronDown } from 'lucide-react'
 import { getCustomers } from '@/services/customers'
+
+// getCustomers optionally accepts a tenantId filter but the existing callers
+// rely on RLS to scope to the current tenant. Keep the wrapper compatible with
+// the old single-arg signature used in EnvioManual.tsx.
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import type { CustomerWithDetails } from '@/types'

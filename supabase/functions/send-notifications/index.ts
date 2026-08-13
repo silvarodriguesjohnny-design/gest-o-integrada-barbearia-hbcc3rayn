@@ -359,11 +359,17 @@ Deno.serve(async (req: Request) => {
     }
 
     // 3. No-show detection
+    // Detects BOTH 'scheduled' and 'confirmed' appointments whose end_time is
+    // in the past and that have not yet received a no-show (absence) notice.
+    // A confirmed appointment that the client did not show up for is treated
+    // as a no-show: an absence message is sent, status -> 'cancelled', and
+    // reminder_sent is set to true. Because the loyalty trigger only fires on
+    // status -> 'completed', a no-show (cancelled) never awards a stamp.
     console.log('[send-notifications] === STEP 3: No-show detection ===')
     const { data: noShowAppts, error: noShowError } = await supabase
       .from('appointments')
       .select('*, customer:customers(*), service:services(*), tenant:tenants(name)')
-      .eq('status', 'scheduled')
+      .in('status', ['scheduled', 'confirmed'])
       .lt('end_time', now.toISOString())
       .neq('reminder_sent', true)
 
