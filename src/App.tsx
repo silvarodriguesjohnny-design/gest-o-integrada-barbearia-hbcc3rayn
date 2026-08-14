@@ -24,6 +24,14 @@ import TrialExpired from './pages/TrialExpired'
 import NotFound from './pages/NotFound'
 import Login from './pages/Login'
 import Layout from './components/Layout'
+import AdminLayout from '@/components/admin/AdminLayout'
+import AdminDashboard from '@/pages/admin/AdminDashboard'
+import AdminCadastros from '@/pages/admin/AdminCadastros'
+import AdminBarbearias from '@/pages/admin/AdminBarbearias'
+import AdminAgendamentos from '@/pages/admin/AdminAgendamentos'
+import AdminClientes from '@/pages/admin/AdminClientes'
+import AdminConfiguracoes from '@/pages/admin/AdminConfiguracoes'
+import AdminRelatorios from '@/pages/admin/AdminRelatorios'
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { user, loading, trialExpired, isSuperAdmin } = useAuth()
@@ -51,6 +59,10 @@ function SuperAdminRoute({ children }: { children: ReactNode }) {
   if (!user) return <Navigate to="/login" replace />
   if (!isSuperAdmin) return <Navigate to="/dashboard" replace />
   return <>{children}</>
+}
+
+function AdminIndexRedirect() {
+  return <Navigate to="/admin/dashboard" replace />
 }
 
 const App = () => (
@@ -93,6 +105,22 @@ const App = () => (
           >
             <Route path="/super-admin" element={<SuperAdmin />} />
             <Route path="/gerenciar-usuarios" element={<UserManagement />} />
+          </Route>
+          <Route
+            element={
+              <SuperAdminRoute>
+                <AdminLayout />
+              </SuperAdminRoute>
+            }
+          >
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/cadastros" element={<AdminCadastros />} />
+            <Route path="/admin/barbearias" element={<AdminBarbearias />} />
+            <Route path="/admin/agendamentos" element={<AdminAgendamentos />} />
+            <Route path="/admin/clientes" element={<AdminClientes />} />
+            <Route path="/admin/relatorios" element={<AdminRelatorios />} />
+            <Route path="/admin/configuracoes" element={<AdminConfiguracoes />} />
+            <Route path="/admin" element={<AdminIndexRedirect />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
