@@ -72,6 +72,23 @@ export interface Product {
   price: number
   tenant_id: string | null
   created_at: string
+  stock_quantity?: number
+  min_stock?: number
+  cost_price?: number | null
+}
+
+export type StockMovementType = 'entrada' | 'saida'
+
+export interface StockMovement {
+  id: string
+  product_id: string
+  movement_type: StockMovementType
+  quantity: number
+  reason: string
+  created_by: string | null
+  tenant_id: string | null
+  created_at: string
+  created_by_name?: string | null
 }
 
 export type AppointmentStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled'

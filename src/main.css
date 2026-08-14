@@ -4,85 +4,101 @@
 
 @layer base {
   :root {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
+    /* Light mode (padrão) */
+    --background: 0 0% 100%;
+    --foreground: 222.2 47.4% 11.2%;
 
-    --card: 222.2 47.4% 11.2%;
-    --card-foreground: 0 0% 98%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 47.4% 11.2%;
 
-    --popover: 222.2 47.4% 11.2%;
-    --popover-foreground: 0 0% 98%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 47.4% 11.2%;
 
-    --primary: 0 0% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 0 0% 98%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 0 0% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
 
     --accent: 32.1 94.6% 43.5%;
     --accent-foreground: 0 0% 98%;
 
-    --destructive: 0 62.8% 50.6%;
+    --destructive: 0 72.2% 50.6%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
     --ring: 32.1 94.6% 43.5%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 222.2 47.4% 7%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 0 0% 98%;
-    --sidebar-primary-foreground: 222.2 47.4% 11.2%;
-    --sidebar-accent: 217.2 32.6% 15%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 217.2 32.6% 15%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 222.2 47.4% 11.2%;
+    --sidebar-primary: 222.2 47.4% 11.2%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 210 40% 96.1%;
+    --sidebar-accent-foreground: 222.2 47.4% 11.2%;
+    --sidebar-border: 214.3 31.8% 91.4%;
     --sidebar-ring: 32.1 94.6% 43.5%;
 
     --chart-1: 32.1 94.6% 43.5%;
-    --chart-2: 0 0% 98%;
+    --chart-2: 222.2 47.4% 30%;
     --chart-3: 35 100% 50%;
-    --chart-4: 215 20.2% 65.1%;
-    --chart-5: 0 62.8% 50.6%;
+    --chart-4: 215 20.2% 45.1%;
+    --chart-5: 0 72.2% 50.6%;
   }
 
   .dark {
-    --background: 0 0% 3.9%;
+    /* Dark mode — paleta gray-900/950 */
+    --background: 220 13% 9%;
     --foreground: 0 0% 98%;
-    --card: 222.2 47.4% 11.2%;
+
+    --card: 220 13% 13%;
     --card-foreground: 0 0% 98%;
-    --popover: 222.2 47.4% 11.2%;
+
+    --popover: 220 13% 13%;
     --popover-foreground: 0 0% 98%;
+
     --primary: 0 0% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
+    --primary-foreground: 220 13% 9%;
+
+    --secondary: 220 13% 18%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 217.2 32.6% 17.5%;
+
+    --muted: 220 13% 18%;
     --muted-foreground: 215 20.2% 65.1%;
+
     --accent: 32.1 94.6% 43.5%;
     --accent-foreground: 0 0% 98%;
+
     --destructive: 0 62.8% 50.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
+
+    --border: 220 13% 22%;
+    --input: 220 13% 18%;
     --ring: 32.1 94.6% 43.5%;
-    --sidebar-background: 222.2 47.4% 7%;
+
+    --sidebar-background: 220 13% 6%;
     --sidebar-foreground: 0 0% 98%;
     --sidebar-primary: 0 0% 98%;
-    --sidebar-primary-foreground: 222.2 47.4% 11.2%;
-    --sidebar-accent: 217.2 32.6% 15%;
+    --sidebar-primary-foreground: 220 13% 9%;
+    --sidebar-accent: 220 13% 16%;
     --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 217.2 32.6% 15%;
+    --sidebar-border: 220 13% 18%;
     --sidebar-ring: 32.1 94.6% 43.5%;
+
     --chart-1: 32.1 94.6% 43.5%;
     --chart-2: 0 0% 98%;
-    --chart-3: 35 100% 50%;
+    --chart-3: 35 100% 55%;
     --chart-4: 215 20.2% 65.1%;
-    --chart-5: 0 62.8% 50.6%;
+    --chart-5: 0 62.8% 55%;
+  }
+
+  * {
+    @apply border-border;
   }
 
   body {
@@ -93,6 +109,9 @@
       transparent 500px
     );
     background-attachment: fixed;
+    transition:
+      background-color 0.3s ease,
+      color 0.3s ease;
   }
 
   h1,

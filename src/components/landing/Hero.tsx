@@ -4,17 +4,17 @@ import { Button } from '@/components/ui/button'
 
 export function Hero() {
   return (
-    <section className="relative overflow-hidden bg-[#0a0a0a]">
+    <section className="relative overflow-hidden bg-background">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(217,119,6,0.15),_transparent_50%)]" />
       <div className="relative mx-auto max-w-5xl px-4 py-24 md:py-32 text-center">
         <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/5 px-4 py-1.5 text-sm text-amber-500 mb-6 animate-fade-in-down">
           <Sparkles className="h-4 w-4" />
           30 dias grátis &middot; Sem cartão de crédito
         </div>
-        <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-white animate-fade-in-up">
+        <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-foreground animate-fade-in-up">
           A plataforma completa para <span className="text-amber-500">barbearias modernas</span>
         </h1>
-        <p className="mx-auto mt-6 max-w-2xl text-lg text-slate-400 animate-fade-in-up">
+        <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground animate-fade-in-up">
           Automatize agendamentos, fidelize clientes, controle seu financeiro e aumente seu
           faturamento. Tudo em uma única plataforma feita para barbearias.
         </p>
@@ -32,13 +32,13 @@ export function Hero() {
             <Button
               variant="outline"
               size="lg"
-              className="h-14 px-8 text-lg border-white/20 text-white hover:bg-white/5"
+              className="h-14 px-8 text-lg border-border text-foreground hover:bg-muted"
             >
               Ver Planos
             </Button>
           </a>
         </div>
-        <div className="mt-16 flex flex-wrap items-center justify-center gap-8 text-slate-400">
+        <div className="mt-16 flex flex-wrap items-center justify-center gap-8 text-muted-foreground">
           <div className="flex items-center gap-2 text-sm">
             <Calendar className="h-5 w-5 text-amber-500" />
             Agenda automatizada

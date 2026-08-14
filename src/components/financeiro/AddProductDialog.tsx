@@ -26,6 +26,9 @@ export function AddProductDialog({
   const [name, setName] = useState('')
   const [price, setPrice] = useState('')
   const [description, setDescription] = useState('')
+  const [stockQuantity, setStockQuantity] = useState('')
+  const [minStock, setMinStock] = useState('')
+  const [costPrice, setCostPrice] = useState('')
   const [loading, setLoading] = useState(false)
 
   const handleSave = async () => {
@@ -38,6 +41,9 @@ export function AddProductDialog({
       name: name.trim(),
       price: Number(price),
       description: description.trim() || undefined,
+      stock_quantity: stockQuantity ? Number(stockQuantity) : 0,
+      min_stock: minStock ? Number(minStock) : 5,
+      cost_price: costPrice ? Number(costPrice) : null,
     })
     setLoading(false)
     if (error) {
@@ -48,6 +54,9 @@ export function AddProductDialog({
     setName('')
     setPrice('')
     setDescription('')
+    setStockQuantity('')
+    setMinStock('')
+    setCostPrice('')
     onOpenChange(false)
     onCreated()
   }
@@ -83,6 +92,39 @@ export function AddProductDialog({
               placeholder="Opcional"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label className="font-semibold">Estoque Inicial</Label>
+              <Input
+                type="number"
+                min="0"
+                placeholder="0"
+                value={stockQuantity}
+                onChange={(e) => setStockQuantity(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="font-semibold">Estoque Mínimo</Label>
+              <Input
+                type="number"
+                min="0"
+                placeholder="5"
+                value={minStock}
+                onChange={(e) => setMinStock(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label className="font-semibold">Preço de Custo (R$)</Label>
+            <Input
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Opcional"
+              value={costPrice}
+              onChange={(e) => setCostPrice(e.target.value)}
             />
           </div>
         </div>

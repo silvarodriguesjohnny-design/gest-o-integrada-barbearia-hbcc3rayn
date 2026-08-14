@@ -24,13 +24,13 @@ const TESTIMONIALS = [
 
 export function Testimonials() {
   return (
-    <section id="testimonials" className="py-20 md:py-28 bg-[#0a0a0a]">
+    <section id="testimonials" className="py-20 md:py-28 bg-background">
       <div className="mx-auto max-w-6xl px-4">
         <div className="text-center mb-14">
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-white">
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
             Barbeiros que já transformaram seus negócios
           </h2>
-          <p className="mt-3 text-slate-400 text-lg">
+          <p className="mt-3 text-muted-foreground text-lg">
             Mais de 500 barbearias já usam o na régua para crescer.
           </p>
         </div>
@@ -38,7 +38,7 @@ export function Testimonials() {
           {TESTIMONIALS.map((t) => (
             <Card
               key={t.name}
-              className="bg-slate-900 border-slate-800 hover:border-amber-500/30 transition-all duration-300"
+              className="bg-card border-border hover:border-amber-500/30 transition-all duration-300"
             >
               <CardContent className="pt-6 space-y-4">
                 <div className="flex gap-1">
@@ -46,12 +46,14 @@ export function Testimonials() {
                     <Star key={i} className="h-4 w-4 fill-amber-500 text-amber-500" />
                   ))}
                 </div>
-                <p className="text-sm text-slate-300 leading-relaxed">&ldquo;{t.text}&rdquo;</p>
-                <div className="flex items-center gap-3 pt-2 border-t border-slate-800">
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  &ldquo;{t.text}&rdquo;
+                </p>
+                <div className="flex items-center gap-3 pt-2 border-t border-border">
                   <img src={t.image} alt={t.name} className="h-10 w-10 rounded-full object-cover" />
                   <div>
-                    <p className="text-sm font-semibold text-white">{t.name}</p>
-                    <p className="text-xs text-slate-400">{t.shop}</p>
+                    <p className="text-sm font-semibold text-foreground">{t.name}</p>
+                    <p className="text-xs text-muted-foreground">{t.shop}</p>
                   </div>
                 </div>
               </CardContent>

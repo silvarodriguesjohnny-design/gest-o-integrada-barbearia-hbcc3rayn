@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Calendar } from '@/components/ui/calendar'
 import { Scissors, Clock, Loader2, CheckCircle2, CalendarDays, User, CalendarX } from 'lucide-react'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { ptBR } from 'date-fns/locale'
 import { useToast } from '@/hooks/use-toast'
 import { ClientIdentification } from '@/components/public/ClientIdentification'
@@ -213,10 +214,11 @@ export default function PublicBooking() {
               <Scissors className="h-6 w-6 text-accent" />
             </div>
           )}
-          <div>
+          <div className="flex-1">
             <h1 className="text-2xl font-bold">{tenant?.name}</h1>
             <p className="text-sm text-muted-foreground">Agendamento Online</p>
           </div>
+          <ThemeToggle />
         </div>
 
         {!customer ? (

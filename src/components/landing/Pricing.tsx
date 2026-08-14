@@ -48,13 +48,13 @@ const PLANS = [
 
 export function Pricing() {
   return (
-    <section id="pricing" className="py-20 md:py-28 bg-slate-950">
+    <section id="pricing" className="py-20 md:py-28 bg-muted/30">
       <div className="mx-auto max-w-6xl px-4">
         <div className="text-center mb-14">
-          <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-white">
+          <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
             Escolha seu plano
           </h2>
-          <p className="mt-3 text-slate-400 text-lg">
+          <p className="mt-3 text-muted-foreground text-lg">
             Comece hoje com 30 dias grátis. Sem cartão de crédito. Cancele quando quiser.
           </p>
         </div>
@@ -63,7 +63,7 @@ export function Pricing() {
             <Card
               key={plan.name}
               className={cn(
-                'relative bg-slate-900 border-slate-800 transition-all duration-300',
+                'relative bg-card border-border transition-all duration-300',
                 plan.popular
                   ? 'border-amber-500/50 shadow-lg shadow-amber-500/10 md:-translate-y-4 scale-105'
                   : 'hover:border-amber-500/30 hover:-translate-y-1',
@@ -77,18 +77,18 @@ export function Pricing() {
                 </div>
               )}
               <CardHeader>
-                <CardTitle className="text-xl text-white">{plan.name}</CardTitle>
+                <CardTitle className="text-xl text-foreground">{plan.name}</CardTitle>
                 <div className="mt-2">
-                  <span className="text-4xl font-bold text-white">R$ {plan.price}</span>
-                  <span className="text-slate-400">/mês</span>
+                  <span className="text-4xl font-bold text-foreground">R$ {plan.price}</span>
+                  <span className="text-muted-foreground">/mês</span>
                 </div>
                 <p className="text-sm text-amber-500 font-medium mt-1">{plan.barbers}</p>
-                <p className="text-xs text-slate-500">{plan.extra}</p>
+                <p className="text-xs text-muted-foreground">{plan.extra}</p>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-3 mb-6">
                   {plan.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2 text-sm text-slate-300">
+                    <li key={f} className="flex items-center gap-2 text-sm text-foreground">
                       <Check className="h-4 w-4 text-emerald-500 shrink-0" />
                       <span>{f}</span>
                     </li>
@@ -100,7 +100,7 @@ export function Pricing() {
                       'w-full',
                       plan.popular
                         ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                        : 'bg-slate-800 hover:bg-slate-700 text-white border border-slate-700',
+                        : 'bg-secondary hover:bg-secondary/80 text-foreground border border-border',
                     )}
                   >
                     Teste Grátis por 30 Dias

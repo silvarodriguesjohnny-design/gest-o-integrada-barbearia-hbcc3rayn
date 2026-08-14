@@ -198,12 +198,12 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-slate-100 p-4 py-8 flex items-center justify-center">
-      <Card className="w-full max-w-2xl mx-auto shadow-2xl bg-[#121212] border-amber-500/20 text-slate-100">
+    <div className="min-h-screen bg-background text-foreground p-4 py-8 flex items-center justify-center">
+      <Card className="w-full max-w-2xl mx-auto shadow-2xl bg-card border-amber-500/20 text-card-foreground">
         <CardHeader className="space-y-3">
           <Link
             to="/"
-            className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-amber-500 transition-colors"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-amber-500 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" /> Voltar
           </Link>
@@ -211,8 +211,10 @@ export default function Onboarding() {
             <Scissors className="h-6 w-6 text-amber-500" />
             <span>na régua</span>
           </div>
-          <CardTitle className="text-2xl font-bold text-white">Cadastre sua barbearia</CardTitle>
-          <CardDescription className="text-slate-400">
+          <CardTitle className="text-2xl font-bold text-foreground">
+            Cadastre sua barbearia
+          </CardTitle>
+          <CardDescription className="text-muted-foreground">
             Preencha os dados abaixo. Após aprovação, você receberá um e-mail para definir sua
             senha.
           </CardDescription>

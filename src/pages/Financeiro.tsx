@@ -31,12 +31,16 @@ import {
   Plus,
   Filter,
   X,
+  History,
+  PackagePlus,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { AddExpenseDialog } from '@/components/financeiro/AddExpenseDialog'
 import { getTransactions, createTransaction } from '@/services/transactions'
 import { getServices } from '@/services/catalog'
 import { getProducts } from '@/services/products'
 import { getCustomers } from '@/services/customers'
+import { decrementStockOnSale } from '@/services/stock'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
 import { cn } from '@/lib/utils'
@@ -45,6 +49,9 @@ import { generateFinanceiroPDF } from '@/lib/pdf-report'
 import { generateFinanceiroExcel } from '@/lib/excel-export'
 import { AddServiceDialog } from '@/components/financeiro/AddServiceDialog'
 import { AddProductDialog } from '@/components/financeiro/AddProductDialog'
+import { StockEntryDialog } from '@/components/financeiro/StockEntryDialog'
+import { StockAdjustDialog } from '@/components/financeiro/StockAdjustDialog'
+import { StockHistoryDialog } from '@/components/financeiro/StockHistoryDialog'
 import type { Transaction, Service, CustomerWithDetails, Product } from '@/types'
 
 interface CartItem {
@@ -55,7 +62,7 @@ interface CartItem {
 
 export default function Financeiro() {
   const { toast } = useToast()
-  const { tenant } = useAuth()
+  const { tenant, profile } = useAuth()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [services, setServices] = useState<Service[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -71,6 +78,14 @@ export default function Financeiro() {
   const [showAddService, setShowAddService] = useState(false)
   const [showAddProduct, setShowAddProduct] = useState(false)
   const [showAddExpense, setShowAddExpense] = useState(false)
+
+  // Controle de estoque (apenas admin / barbeiro chefe)
+  const isStockManager = profile?.role === 'admin' || !!profile?.is_super_admin
+  const [stockProduct, setStockProduct] = useState<Product | null>(null)
+  const [showStockEntry, setShowStockEntry] = useState(false)
+  const [showStockAdjust, setShowStockAdjust] = useState(false)
+  const [showStockHistory, setShowStockHistory] = useState(false)
+  const [tab, setTab] = useState('pdv')
 
   const [fType, setFType] = useState('all')
   const [fCategory, setFCategory] = useState('all')
@@ -136,12 +151,27 @@ export default function Financeiro() {
         setCheckingOut(false)
         return
       }
+      // Baixa automática de estoque para produtos vendidos no PDV
+      if (item.type === 'product') {
+        const prod = products.find((p) => p.name === item.name)
+        if (prod) {
+          const { error: stockError } = await decrementStockOnSale(prod.id)
+          if (stockError) {
+            toast({
+              title: 'Aviso de estoque',
+              description: `Não foi possível baixar o estoque de ${item.name}: ${stockError.message}`,
+              variant: 'destructive',
+            })
+          }
+        }
+      }
     }
     setCheckingOut(false)
     setCart([])
     setCustomerId('')
     toast({ title: 'Venda finalizada!', description: 'Transações registradas com sucesso.' })
     loadAll()
+    loadProducts()
   }
 
   const clearFilters = () => {
@@ -210,8 +240,10 @@ export default function Financeiro() {
         <p className="text-muted-foreground mt-1">Feche atendimentos e controle seu caixa.</p>
       </div>
 
-      <Tabs defaultValue="pdv" className="w-full">
-        <TabsList className="grid w-full max-w-md grid-cols-2">
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
+        <TabsList
+          className={cn('grid w-full max-w-2xl', isStockManager ? 'grid-cols-3' : 'grid-cols-2')}
+        >
           <TabsTrigger
             value="pdv"
             className="data-[state=active]:bg-accent data-[state=active]:text-white"
@@ -219,6 +251,7 @@ export default function Financeiro() {
             Controle de Caixa
           </TabsTrigger>
           <TabsTrigger value="fluxo">Fluxo de Caixa</TabsTrigger>
+          {isStockManager && <TabsTrigger value="estoque">Estoque</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="pdv" className="mt-6">
@@ -384,6 +417,161 @@ export default function Financeiro() {
             </Card>
           </div>
         </TabsContent>
+
+        {isStockManager && (
+          <TabsContent value="estoque" className="mt-6 space-y-4">
+            <div>
+              <h2 className="text-xl font-bold font-serif flex items-center gap-2">
+                Controle de Estoque
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Monitore quantidades, receba alertas e registre entradas e ajustes.
+              </p>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <Card className="hover:shadow-elevation transition-shadow">
+                <CardContent className="pt-6">
+                  <p className="text-xs text-muted-foreground uppercase font-semibold">
+                    Produtos Cadastrados
+                  </p>
+                  <p className="text-2xl font-bold">{products.length}</p>
+                </CardContent>
+              </Card>
+              <Card className="border-destructive/50 hover:shadow-elevation transition-shadow">
+                <CardContent className="pt-6">
+                  <p className="text-xs text-muted-foreground uppercase font-semibold">
+                    Estoque Baixo
+                  </p>
+                  <p className="text-2xl font-bold text-destructive">
+                    {products.filter((p) => (p.stock_quantity ?? 0) <= (p.min_stock ?? 5)).length}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="border-amber-500/40 hover:shadow-elevation transition-shadow">
+                <CardContent className="pt-6">
+                  <p className="text-xs text-muted-foreground uppercase font-semibold">
+                    Estoque Médio
+                  </p>
+                  <p className="text-2xl font-bold text-amber-600 dark:text-amber-500">
+                    {
+                      products.filter((p) => {
+                        const q = p.stock_quantity ?? 0
+                        const min = p.min_stock ?? 5
+                        return q > min && q <= min * 2
+                      }).length
+                    }
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+            <Card className="hover:shadow-elevation transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between border-b bg-muted/20 pb-4">
+                <CardTitle className="font-serif text-xl">Produtos & Estoque</CardTitle>
+                <Button variant="outline" size="sm" onClick={() => setShowAddProduct(true)}>
+                  <Plus className="h-4 w-4 mr-2" /> Novo Produto
+                </Button>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="pl-6">Produto</TableHead>
+                      <TableHead>Preço</TableHead>
+                      <TableHead>Estoque</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right pr-6">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {products.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                          Nenhum produto cadastrado.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      products.map((p) => {
+                        const q = p.stock_quantity ?? 0
+                        const min = p.min_stock ?? 5
+                        const isLow = q <= min
+                        const isMedium = q > min && q <= min * 2
+                        return (
+                          <TableRow key={p.id} className="hover:bg-muted/30">
+                            <TableCell className="pl-6 font-medium">
+                              {p.name}
+                              {p.description && (
+                                <span className="block text-xs text-muted-foreground">
+                                  {p.description}
+                                </span>
+                              )}
+                            </TableCell>
+                            <TableCell>{fmt(Number(p.price))}</TableCell>
+                            <TableCell className="font-semibold">{q}</TableCell>
+                            <TableCell>
+                              {isLow ? (
+                                <Badge className="bg-red-600 hover:bg-red-600 text-white">
+                                  Estoque Baixo
+                                </Badge>
+                              ) : isMedium ? (
+                                <Badge className="bg-amber-500 hover:bg-amber-500 text-white">
+                                  Estoque Médio
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white">
+                                  OK
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right pr-6">
+                              <div className="flex justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  title="Entrada de estoque"
+                                  onClick={() => {
+                                    setStockProduct(p)
+                                    setShowStockEntry(true)
+                                  }}
+                                >
+                                  <PackagePlus className="h-4 w-4 text-emerald-600" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  title="Ajustar estoque"
+                                  onClick={() => {
+                                    setStockProduct(p)
+                                    setShowStockAdjust(true)
+                                  }}
+                                >
+                                  <SlidersHorizontal className="h-4 w-4 text-accent" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  title="Histórico de movimentações"
+                                  onClick={() => {
+                                    setStockProduct(p)
+                                    setShowStockHistory(true)
+                                  }}
+                                >
+                                  <History className="h-4 w-4 text-muted-foreground" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         <TabsContent value="fluxo" className="mt-6">
           <Card className="hover:shadow-elevation transition-shadow mb-4">
@@ -587,6 +775,23 @@ export default function Financeiro() {
         open={showAddExpense}
         onOpenChange={setShowAddExpense}
         onCreated={loadAll}
+      />
+      <StockEntryDialog
+        product={stockProduct}
+        open={showStockEntry}
+        onOpenChange={setShowStockEntry}
+        onDone={loadProducts}
+      />
+      <StockAdjustDialog
+        product={stockProduct}
+        open={showStockAdjust}
+        onOpenChange={setShowStockAdjust}
+        onDone={loadProducts}
+      />
+      <StockHistoryDialog
+        product={stockProduct}
+        open={showStockHistory}
+        onOpenChange={setShowStockHistory}
       />
     </div>
   )
