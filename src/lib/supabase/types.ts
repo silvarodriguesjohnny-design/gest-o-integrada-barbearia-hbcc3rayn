@@ -684,47 +684,85 @@ export type Database = {
           },
         ]
       }
+      subscription_invoices: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          paid_at: string | null
+          status: string
+          stripe_invoice_id: string | null
+          subscription_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          id?: string
+          paid_at?: string | null
+          status?: string
+          stripe_invoice_id?: string | null
+          subscription_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          paid_at?: string | null
+          status?: string
+          stripe_invoice_id?: string | null
+          subscription_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'subscription_invoices_subscription_id_fkey'
+            columns: ['subscription_id']
+            isOneToOne: false
+            referencedRelation: 'subscriptions'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       subscription_plans: {
         Row: {
-          id: string
-          tenant_id: string
-          name: string
+          active: boolean
+          created_at: string
           description: string | null
-          services_included: Json
-          price: number
+          id: string
+          name: string
           prepaid_discount_pct: number
           prepaid_months: number
           prepaid_price: number
-          active: boolean
-          created_at: string
+          price: number
+          services_included: Json
+          tenant_id: string
           updated_at: string
         }
         Insert: {
-          id?: string
-          tenant_id: string
-          name: string
+          active?: boolean
+          created_at?: string
           description?: string | null
-          services_included?: Json
-          price?: number
+          id?: string
+          name: string
           prepaid_discount_pct?: number
           prepaid_months?: number
           prepaid_price?: number
-          active?: boolean
-          created_at?: string
+          price?: number
+          services_included?: Json
+          tenant_id: string
           updated_at?: string
         }
         Update: {
-          id?: string
-          tenant_id?: string
-          name?: string
+          active?: boolean
+          created_at?: string
           description?: string | null
-          services_included?: Json
-          price?: number
+          id?: string
+          name?: string
           prepaid_discount_pct?: number
           prepaid_months?: number
           prepaid_price?: number
-          active?: boolean
-          created_at?: string
+          price?: number
+          services_included?: Json
+          tenant_id?: string
           updated_at?: string
         }
         Relationships: [
@@ -739,48 +777,48 @@ export type Database = {
       }
       subscriptions: {
         Row: {
-          id: string
-          client_id: string
-          tenant_id: string
-          plan_id: string
-          stripe_subscription_id: string | null
-          stripe_customer_id: string | null
-          status: string
-          payment_type: string
-          start_date: string
-          end_date: string | null
           amount_paid: number
+          client_id: string
           created_at: string
+          end_date: string | null
+          id: string
+          payment_type: string
+          plan_id: string
+          start_date: string
+          status: string
+          stripe_customer_id: string | null
+          stripe_subscription_id: string | null
+          tenant_id: string
           updated_at: string
         }
         Insert: {
-          id?: string
-          client_id: string
-          tenant_id: string
-          plan_id: string
-          stripe_subscription_id?: string | null
-          stripe_customer_id?: string | null
-          status?: string
-          payment_type?: string
-          start_date?: string
-          end_date?: string | null
           amount_paid?: number
+          client_id: string
           created_at?: string
+          end_date?: string | null
+          id?: string
+          payment_type?: string
+          plan_id: string
+          start_date?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tenant_id: string
           updated_at?: string
         }
         Update: {
-          id?: string
-          client_id?: string
-          tenant_id?: string
-          plan_id?: string
-          stripe_subscription_id?: string | null
-          stripe_customer_id?: string | null
-          status?: string
-          payment_type?: string
-          start_date?: string
-          end_date?: string | null
           amount_paid?: number
+          client_id?: string
           created_at?: string
+          end_date?: string | null
+          id?: string
+          payment_type?: string
+          plan_id?: string
+          start_date?: string
+          status?: string
+          stripe_customer_id?: string | null
+          stripe_subscription_id?: string | null
+          tenant_id?: string
           updated_at?: string
         }
         Relationships: [
@@ -792,55 +830,17 @@ export type Database = {
             referencedColumns: ['id']
           },
           {
-            foreignKeyName: 'subscriptions_tenant_id_fkey'
-            columns: ['tenant_id']
-            isOneToOne: false
-            referencedRelation: 'tenants'
-            referencedColumns: ['id']
-          },
-          {
             foreignKeyName: 'subscriptions_plan_id_fkey'
             columns: ['plan_id']
             isOneToOne: false
             referencedRelation: 'subscription_plans'
             referencedColumns: ['id']
           },
-        ]
-      }
-      subscription_invoices: {
-        Row: {
-          id: string
-          subscription_id: string | null
-          stripe_invoice_id: string | null
-          amount: number
-          status: string
-          paid_at: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          subscription_id?: string | null
-          stripe_invoice_id?: string | null
-          amount?: number
-          status?: string
-          paid_at?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          subscription_id?: string | null
-          stripe_invoice_id?: string | null
-          amount?: number
-          status?: string
-          paid_at?: string | null
-          created_at?: string
-        }
-        Relationships: [
           {
-            foreignKeyName: 'subscription_invoices_subscription_id_fkey'
-            columns: ['subscription_id']
+            foreignKeyName: 'subscriptions_tenant_id_fkey'
+            columns: ['tenant_id']
             isOneToOne: false
-            referencedRelation: 'subscriptions'
+            referencedRelation: 'tenants'
             referencedColumns: ['id']
           },
         ]

@@ -9,7 +9,6 @@ const PLANS = [
     name: 'Essential',
     price: '97,90',
     barbers: '2 barbeiros inclusos',
-    extra: '+ R$ 29,00 por barbeiro extra',
     features: [
       'Agendamento automatizado',
       'CRM de clientes',
@@ -21,7 +20,6 @@ const PLANS = [
     name: 'Pro',
     price: '117,90',
     barbers: '3 barbeiros inclusos',
-    extra: '+ R$ 29,00 por barbeiro extra',
     features: [
       'Tudo do Essential',
       'Programa de fidelidade',
@@ -83,7 +81,7 @@ export function Pricing() {
                   <span className="text-muted-foreground">/mês</span>
                 </div>
                 <p className="text-sm text-accent font-medium mt-1">{plan.barbers}</p>
-                <p className="text-xs text-muted-foreground">{plan.extra}</p>
+                {plan.extra && <p className="text-xs text-muted-foreground">{plan.extra}</p>}
               </CardHeader>
               <CardContent>
                 <ul className="space-y-3 mb-6">
