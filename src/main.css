@@ -186,7 +186,40 @@
   }
 }
 
+@layer components {
+  /* ============================================================
+     FASE 4 — Otimização Tablet / Totem de recepção
+     Touch targets, inputs e interações otimizadas para toque
+     ============================================================ */
+
+  /* Inputs e botões com altura ergonômica para toque */
+  .tablet-input {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Card tocável (serviços, identificação) — sem hover em touch */
+  .touch-card {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      transform 0.15s ease-in-out,
+      border-color 0.15s ease-in-out,
+      box-shadow 0.15s ease-in-out;
+  }
+}
+
 @layer utilities {
+  /* Em dispositivos sem hover real (tablet/totem), suprime estados hover
+     para evitar "sticky hover" e usa apenas :active e :focus-visible */
+  @media (hover: none) {
+    .touch-card:hover {
+      border-color: hsl(var(--border));
+      box-shadow: none;
+      transform: none;
+    }
+  }
+
   @keyframes fade-in-up {
     from {
       transform: translateY(10px);

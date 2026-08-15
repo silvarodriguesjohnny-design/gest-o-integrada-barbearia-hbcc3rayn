@@ -179,8 +179,8 @@ export default function Agenda() {
               ) : (
                 filteredAppointments.map((app) => {
                   const statusInfo = STATUS_LABELS[app.status] || {
-                    label: app.status,
-                    class: '',
+                    label: app.status as string,
+                    variant: 'outline' as const,
                   }
                   return (
                     <div
