@@ -83,7 +83,7 @@ export default function SetPassword() {
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md text-center">
           <CardHeader className="space-y-3">
-            <CheckCircle className="h-12 w-12 text-emerald-500 mx-auto" />
+            <CheckCircle className="h-12 w-12 text-success mx-auto" />
             <CardTitle className="text-2xl">Senha definida com sucesso!</CardTitle>
             <CardDescription>
               Você já pode fazer login com sua nova senha. Redirecionando...
@@ -137,8 +137,12 @@ export default function SetPassword() {
                 minLength={6}
               />
             </div>
-            <Button type="submit" className="w-full h-12 text-base" disabled={submitting}>
-              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button
+              type="submit"
+              variant="amber"
+              className="w-full h-12 text-base"
+              loading={submitting}
+            >
               Definir senha
             </Button>
           </form>

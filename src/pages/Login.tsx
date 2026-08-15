@@ -135,7 +135,7 @@ export default function Login() {
                     <button
                       type="button"
                       onClick={() => setForgotMode(true)}
-                      className="text-xs text-accent hover:underline"
+                      className="text-xs text-accent hover:text-accent/80 transition-colors duration-200 ease-in-out hover:underline"
                     >
                       Esqueci minha senha
                     </button>
@@ -150,8 +150,12 @@ export default function Login() {
                   />
                 </div>
               )}
-              <Button type="submit" className="w-full h-12 text-base" disabled={loading}>
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button
+                type="submit"
+                variant="amber"
+                className="w-full h-12 text-base"
+                loading={loading}
+              >
                 {forgotMode ? 'Enviar link de redefinição' : 'Entrar'}
               </Button>
               {forgotMode && (

@@ -17,15 +17,15 @@ import { ManualTenantDialog } from '@/components/admin/ManualTenantDialog'
 import { useToast } from '@/hooks/use-toast'
 
 const PLAN_LABELS: Record<string, string> = { essential: 'Essential', pro: 'Pro', elite: 'Elite' }
-const PLAN_COLORS: Record<string, string> = {
-  essential: 'bg-blue-100 text-blue-700',
-  pro: 'bg-accent text-white',
-  elite: 'bg-purple-100 text-purple-700',
+const PLAN_VARIANTS: Record<string, 'info' | 'amber' | 'outline'> = {
+  essential: 'info',
+  pro: 'amber',
+  elite: 'outline',
 }
-const STATUS_COLORS: Record<string, string> = {
-  trial: 'bg-amber-100 text-amber-700',
-  active: 'bg-emerald-100 text-emerald-700',
-  past_due: 'bg-red-100 text-red-700',
+const STATUS_VARIANTS: Record<string, 'warning' | 'success' | 'danger'> = {
+  trial: 'warning',
+  active: 'success',
+  past_due: 'danger',
 }
 
 export default function AdminBarbearias() {
@@ -70,7 +70,7 @@ export default function AdminBarbearias() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card className="hover:shadow-elevation transition-shadow">
+        <Card className="hover:shadow-md transition-shadow duration-200 ease-in-out">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total de Barbearias</CardTitle>
             <Building2 className="h-4 w-4 text-muted-foreground" />
@@ -79,18 +79,18 @@ export default function AdminBarbearias() {
             <div className="text-2xl font-bold">{tenants.length}</div>
           </CardContent>
         </Card>
-        <Card className="hover:shadow-elevation transition-shadow">
+        <Card className="hover:shadow-md transition-shadow duration-200 ease-in-out">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Ativas</CardTitle>
-            <Building2 className="h-4 w-4 text-emerald-500" />
+            <Building2 className="h-4 w-4 text-success" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-emerald-600">
+            <div className="text-2xl font-bold text-success">
               {tenants.filter((t) => t.subscription_type === 'active').length}
             </div>
           </CardContent>
         </Card>
-        <Card className="hover:shadow-elevation transition-shadow">
+        <Card className="hover:shadow-md transition-shadow duration-200 ease-in-out">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">MRR Total</CardTitle>
           </CardHeader>
@@ -100,7 +100,7 @@ export default function AdminBarbearias() {
         </Card>
       </div>
 
-      <Card className="hover:shadow-elevation transition-shadow">
+      <Card className="hover:shadow-md transition-shadow duration-200 ease-in-out">
         <CardHeader className="border-b bg-muted/20 pb-4">
           <CardTitle className="font-serif text-xl">Barbearias Cadastradas</CardTitle>
         </CardHeader>
@@ -125,7 +125,7 @@ export default function AdminBarbearias() {
                 </TableRow>
               ) : (
                 tenants.map((t) => (
-                  <TableRow key={t.id} className="hover:bg-muted/30">
+                  <TableRow key={t.id} className="hover:bg-muted/40">
                     <TableCell className="pl-6 font-medium">
                       <div className="flex items-center gap-2">
                         {t.logo_url ? (
@@ -146,29 +146,21 @@ export default function AdminBarbearias() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={PLAN_COLORS[t.plan_type] || ''} variant="secondary">
+                      <Badge variant={PLAN_VARIANTS[t.plan_type] || 'outline'}>
                         {PLAN_LABELS[t.plan_type] || t.plan_type}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge
-                        className={STATUS_COLORS[t.subscription_type] || ''}
-                        variant="secondary"
-                      >
+                      <Badge variant={STATUS_VARIANTS[t.subscription_type] || 'outline'}>
                         {t.subscription_type || 'trial'}
                       </Badge>
                     </TableCell>
                     <TableCell>{t.barber_count || 0}</TableCell>
-                    <TableCell className="text-right pr-6 font-bold text-emerald-600">
+                    <TableCell className="text-right pr-6 font-bold text-success">
                       {fmt(t.mrr || 0)}
                     </TableCell>
                     <TableCell className="text-right pr-6">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="hover:bg-accent/10 hover:text-accent"
-                        onClick={() => setEditingTenant(t)}
-                      >
+                      <Button variant="ghost" size="sm" onClick={() => setEditingTenant(t)}>
                         Editar
                       </Button>
                     </TableCell>

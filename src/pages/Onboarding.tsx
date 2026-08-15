@@ -176,19 +176,17 @@ export default function Onboarding() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a] p-4">
-        <Card className="w-full max-w-md text-center shadow-2xl bg-[#121212] border-amber-500/20 text-slate-100">
+      <div className="relative min-h-screen flex items-center justify-center bg-background p-4">
+        <div className="absolute top-0 left-0 right-0 h-1 barber-pole-stripes" />
+        <Card className="w-full max-w-md text-center shadow-lg">
           <CardHeader className="space-y-3">
-            <CheckCircle className="h-14 w-14 text-emerald-500 mx-auto" />
-            <CardTitle className="text-2xl font-bold text-amber-500">Cadastro enviado!</CardTitle>
-            <CardDescription className="text-slate-300">
+            <CheckCircle className="h-14 w-14 text-success mx-auto" />
+            <CardTitle className="text-2xl font-bold text-accent">Cadastro enviado!</CardTitle>
+            <CardDescription className="text-muted-foreground">
               Sua barbearia foi cadastrada e está em análise. Você receberá uma confirmação por
               e-mail assim que for aprovada.
             </CardDescription>
-            <Button
-              onClick={() => navigate('/')}
-              className="w-full mt-4 bg-amber-600 hover:bg-amber-700 text-white font-semibold"
-            >
+            <Button variant="amber" onClick={() => navigate('/')} className="w-full mt-4">
               Voltar ao Início
             </Button>
           </CardHeader>
@@ -198,17 +196,18 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-4 py-8 flex items-center justify-center">
-      <Card className="w-full max-w-2xl mx-auto shadow-2xl bg-card border-amber-500/20 text-card-foreground">
+    <div className="relative min-h-screen bg-background text-foreground p-4 py-8 flex items-center justify-center">
+      <div className="absolute top-0 left-0 right-0 h-1 barber-pole-stripes" />
+      <Card className="w-full max-w-2xl mx-auto shadow-lg">
         <CardHeader className="space-y-3">
           <Link
             to="/"
-            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-amber-500 transition-colors"
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-accent transition-colors duration-200 ease-in-out"
           >
             <ArrowLeft className="h-4 w-4" /> Voltar
           </Link>
-          <div className="flex items-center gap-2 font-serif text-2xl font-bold text-amber-500">
-            <Scissors className="h-6 w-6 text-amber-500" />
+          <div className="flex items-center gap-2 font-serif text-2xl font-bold text-primary">
+            <Scissors className="h-5 w-5 text-accent" />
             <span>na régua</span>
           </div>
           <CardTitle className="text-2xl font-bold text-foreground">
@@ -364,10 +363,10 @@ export default function Onboarding() {
             </div>
             <Button
               type="submit"
-              className="w-full h-12 text-base bg-amber-600 hover:bg-amber-700 text-white font-semibold"
-              disabled={loading}
+              variant="amber"
+              className="w-full h-12 text-base"
+              loading={loading}
             >
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Enviar cadastro
             </Button>
           </form>

@@ -1,5 +1,6 @@
 import { Link, Navigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import { Scissors } from 'lucide-react'
 import { Hero } from '@/components/landing/Hero'
 import { Benefits } from '@/components/landing/Benefits'
 import { Testimonials } from '@/components/landing/Testimonials'
@@ -13,49 +14,47 @@ export default function Landing() {
   if (!loading && user) return <Navigate to="/dashboard" replace />
 
   return (
-    <div className="min-h-screen bg-background text-foreground transition-colors duration-300">
-      <nav className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 transition-colors duration-300">
-        <div className="mx-auto max-w-6xl px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2 font-serif text-2xl font-bold">
-            <span className="text-amber-500">na régua</span>
+    <div className="min-h-screen bg-background text-foreground transition-colors duration-200 ease-in-out">
+      {/* Header fixo 64px */}
+      <header className="sticky top-0 z-50 h-16 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70 transition-colors duration-200 ease-in-out">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-full flex items-center justify-between">
+          <div className="flex items-center gap-2 font-serif text-xl font-bold text-primary">
+            <Scissors className="h-5 w-5 text-accent" />
+            <span>na régua</span>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <a
               href="#benefits"
-              className="hidden md:block text-sm font-medium text-muted-foreground hover:text-amber-500 transition-colors"
+              className="hidden md:block text-sm font-medium text-muted-foreground hover:text-accent transition-colors duration-200 ease-in-out"
             >
               Benefícios
             </a>
             <a
               href="#testimonials"
-              className="hidden md:block text-sm font-medium text-muted-foreground hover:text-amber-500 transition-colors"
+              className="hidden md:block text-sm font-medium text-muted-foreground hover:text-accent transition-colors duration-200 ease-in-out"
             >
               Depoimentos
             </a>
             <a
               href="#pricing"
-              className="hidden md:block text-sm font-medium text-muted-foreground hover:text-amber-500 transition-colors"
+              className="hidden md:block text-sm font-medium text-muted-foreground hover:text-accent transition-colors duration-200 ease-in-out"
             >
               Planos
             </a>
             <ThemeToggle />
             <Link to="/login">
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-muted-foreground hover:text-amber-500"
-              >
+              <Button variant="ghost" size="sm">
                 Login
               </Button>
             </Link>
             <Link to="/onboarding">
-              <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white">
+              <Button variant="amber" size="sm">
                 Teste Grátis
               </Button>
             </Link>
           </div>
         </div>
-      </nav>
+      </header>
 
       <Hero />
       <Benefits />
@@ -63,9 +62,10 @@ export default function Landing() {
       <Pricing />
 
       <footer className="border-t border-border py-10">
-        <div className="mx-auto max-w-6xl px-4 text-center text-sm text-muted-foreground">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center text-sm text-muted-foreground">
           <div className="flex items-center justify-center gap-2 mb-3">
-            <span className="font-serif text-lg font-bold text-amber-500">na régua</span>
+            <Scissors className="h-4 w-4 text-accent" />
+            <span className="font-serif text-lg font-bold text-primary">na régua</span>
           </div>
           <p>&copy; 2026 na régua. A plataforma completa para barbearias modernas.</p>
         </div>

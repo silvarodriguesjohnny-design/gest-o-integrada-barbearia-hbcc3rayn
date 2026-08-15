@@ -139,11 +139,9 @@ export default function AdminClientes() {
                     <TableCell>
                       {c.loyalty_card ? (
                         <div className="flex items-center gap-2">
-                          <Badge variant="secondary" className="bg-accent/15 text-accent">
-                            {c.loyalty_card.stamps_count}/12 selos
-                          </Badge>
+                          <Badge variant="amber">{c.loyalty_card.stamps_count}/12 selos</Badge>
                           {c.loyalty_card.is_reward_ready && (
-                            <Badge className="bg-emerald-100 text-emerald-700" variant="secondary">
+                            <Badge variant="success">
                               <Gift className="h-3 w-3 mr-1" /> Recompensa
                             </Badge>
                           )}

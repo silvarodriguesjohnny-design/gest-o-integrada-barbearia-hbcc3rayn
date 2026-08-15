@@ -19,11 +19,14 @@ import type { AppointmentWithRelations, AppointmentStatus } from '@/types'
 import { EditAppointmentDialog } from '@/components/agenda/EditAppointmentDialog'
 import { getUniqueBarbers } from '@/services/appointments'
 
-const STATUS_META: Record<AppointmentStatus, { label: string; className: string }> = {
-  scheduled: { label: 'Agendado', className: 'bg-blue-100 text-blue-700' },
-  confirmed: { label: 'Confirmado', className: 'bg-emerald-100 text-emerald-700' },
-  completed: { label: 'Concluído', className: 'bg-accent/15 text-accent' },
-  cancelled: { label: 'Cancelado', className: 'bg-red-100 text-red-700' },
+const STATUS_META: Record<
+  AppointmentStatus,
+  { label: string; variant: 'info' | 'success' | 'amber' | 'danger' }
+> = {
+  scheduled: { label: 'Agendado', variant: 'info' },
+  confirmed: { label: 'Confirmado', variant: 'success' },
+  completed: { label: 'Concluído', variant: 'amber' },
+  cancelled: { label: 'Cancelado', variant: 'danger' },
 }
 
 export default function AdminAgendamentos() {
@@ -135,9 +138,7 @@ export default function AdminAgendamentos() {
                       <TableCell className="text-sm">{appt.service?.name || '—'}</TableCell>
                       <TableCell className="text-sm">{appt.barber_name || '—'}</TableCell>
                       <TableCell>
-                        <Badge variant="secondary" className={meta.className}>
-                          {meta.label}
-                        </Badge>
+                        <Badge variant={meta.variant}>{meta.label}</Badge>
                       </TableCell>
                       <TableCell className="text-right pr-6">
                         <Button

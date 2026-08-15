@@ -25,7 +25,7 @@ const TESTIMONIALS = [
 export function Testimonials() {
   return (
     <section id="testimonials" className="py-20 md:py-28 bg-background">
-      <div className="mx-auto max-w-6xl px-4">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-14">
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
             Barbeiros que já transformaram seus negócios
@@ -38,12 +38,12 @@ export function Testimonials() {
           {TESTIMONIALS.map((t) => (
             <Card
               key={t.name}
-              className="bg-card border-border hover:border-amber-500/30 transition-all duration-300"
+              className="border-border transition-all duration-200 ease-in-out hover:border-accent/40 hover:shadow-md"
             >
               <CardContent className="pt-6 space-y-4">
                 <div className="flex gap-1">
                   {Array.from({ length: 5 }).map((_, i) => (
-                    <Star key={i} className="h-4 w-4 fill-amber-500 text-amber-500" />
+                    <Star key={i} className="h-4 w-4 fill-accent text-accent" />
                   ))}
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed">

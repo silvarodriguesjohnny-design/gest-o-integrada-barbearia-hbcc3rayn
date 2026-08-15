@@ -85,11 +85,7 @@ export default function Index() {
             <div className="flex items-center gap-2">
               <Input readOnly value={bookingLink} className="bg-muted/50 font-mono text-sm" />
               <Button variant="outline" size="icon" onClick={handleCopyLink}>
-                {copied ? (
-                  <Check className="h-4 w-4 text-emerald-600" />
-                ) : (
-                  <Copy className="h-4 w-4" />
-                )}
+                {copied ? <Check className="h-4 w-4 text-success" /> : <Copy className="h-4 w-4" />}
               </Button>
             </div>
           </CardContent>
@@ -104,7 +100,7 @@ export default function Index() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{fmt(metrics?.totalRevenue || 0)}</div>
-            <p className="text-xs text-emerald-500 flex items-center mt-1 font-medium">
+            <p className="text-xs text-success flex items-center mt-1 font-medium">
               <ArrowUpRight className="mr-1 h-3 w-3" /> Receita líquida do período
             </p>
           </CardContent>

@@ -11,6 +11,7 @@ export type Database = {
     Tables: {
       appointments: {
         Row: {
+          barber_id: string | null
           barber_name: string | null
           confirmation_token: string | null
           created_at: string
@@ -24,6 +25,7 @@ export type Database = {
           tenant_id: string | null
         }
         Insert: {
+          barber_id?: string | null
           barber_name?: string | null
           confirmation_token?: string | null
           created_at?: string
@@ -37,6 +39,7 @@ export type Database = {
           tenant_id?: string | null
         }
         Update: {
+          barber_id?: string | null
           barber_name?: string | null
           confirmation_token?: string | null
           created_at?: string
@@ -50,6 +53,13 @@ export type Database = {
           tenant_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: 'appointments_barber_id_fkey'
+            columns: ['barber_id']
+            isOneToOne: false
+            referencedRelation: 'barbers'
+            referencedColumns: ['id']
+          },
           {
             foreignKeyName: 'appointments_customer_id_fkey'
             columns: ['customer_id']
@@ -117,6 +127,7 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          public_token: string | null
           tenant_id: string | null
         }
         Insert: {
@@ -124,6 +135,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          public_token?: string | null
           tenant_id?: string | null
         }
         Update: {
@@ -131,6 +143,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          public_token?: string | null
           tenant_id?: string | null
         }
         Relationships: []

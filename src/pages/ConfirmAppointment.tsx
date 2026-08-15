@@ -104,7 +104,7 @@ export default function ConfirmAppointment() {
   }
 
   return (
-    <div className="relative min-h-screen bg-background bg-[radial-gradient(ellipse_at_top,_rgba(217,119,6,0.08),_transparent_50%)] p-4 md:p-8">
+    <div className="relative min-h-screen bg-background p-4 md:p-8">
       <div className="absolute top-0 left-0 right-0 h-1 barber-pole-stripes z-50" />
       <div className="max-w-xl mx-auto">
         {view === 'loading' && (
@@ -142,7 +142,7 @@ export default function ConfirmAppointment() {
         {view === 'already_used' && data?.appointment && (
           <Card className="mt-12">
             <CardContent className="flex flex-col items-center text-center p-8">
-              <AlertCircle className="h-12 w-12 text-amber-500 mb-4" />
+              <AlertCircle className="h-12 w-12 text-warning mb-4" />
               <h1 className="text-xl font-bold">Este link não está mais disponível</h1>
               <p className="text-muted-foreground mt-2">
                 Este agendamento não pode mais ser confirmado por este link
@@ -175,9 +175,9 @@ export default function ConfirmAppointment() {
             </div>
 
             {view === 'confirmed' ? (
-              <Card className="border-emerald-500/40 bg-emerald-500/5">
+              <Card className="border-success/40 bg-success/5">
                 <CardContent className="flex flex-col items-center text-center p-8">
-                  <CheckCircle2 className="h-16 w-16 text-emerald-500 mb-4 animate-bounce" />
+                  <CheckCircle2 className="h-16 w-16 text-success mb-4 animate-bounce" />
                   <h2 className="text-2xl font-bold">Presença confirmada!</h2>
                   <p className="text-muted-foreground mt-2 max-w-sm">
                     Mostre esta tela ao chegar na barbearia.
@@ -257,9 +257,9 @@ export default function ConfirmAppointment() {
                   </div>
 
                   {data.loyalty.is_reward_ready ? (
-                    <div className="flex items-center gap-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 p-3">
-                      <Sparkles className="h-5 w-5 text-emerald-500 shrink-0" />
-                      <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                    <div className="flex items-center gap-2 rounded-lg bg-success/10 border border-success/30 p-3">
+                      <Sparkles className="h-5 w-5 text-success shrink-0" />
+                      <p className="text-sm font-semibold text-success">
                         Recompensa liberada! Resgate seu corte grátis no próximo agendamento.
                       </p>
                     </div>
@@ -279,19 +279,12 @@ export default function ConfirmAppointment() {
             {/* Confirm button */}
             {view === 'confirmable' && (
               <Button
-                className="w-full bg-accent hover:bg-accent/90 text-white font-semibold py-6 text-base shadow-lg"
-                disabled={submitting}
+                variant="amber"
+                loading={submitting}
+                className="w-full py-6 text-base shadow-lg"
                 onClick={handleConfirm}
               >
-                {submitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Confirmando…
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle2 className="mr-2 h-5 w-5" /> Confirmar Presença
-                  </>
-                )}
+                <CheckCircle2 className="mr-2 h-5 w-5" /> Confirmar Presença
               </Button>
             )}
 

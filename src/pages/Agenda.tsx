@@ -48,11 +48,14 @@ import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import type { AppointmentWithRelations, CustomerWithDetails, Service } from '@/types'
 
-const STATUS_LABELS: Record<string, { label: string; class: string }> = {
-  scheduled: { label: 'Agendado', class: 'bg-blue-100 text-blue-800 hover:bg-blue-200' },
-  confirmed: { label: 'Confirmado', class: 'bg-purple-100 text-purple-800 hover:bg-purple-200' },
-  completed: { label: 'Concluído', class: 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200' },
-  cancelled: { label: 'Cancelado', class: 'bg-red-100 text-red-800 hover:bg-red-200' },
+const STATUS_LABELS: Record<
+  string,
+  { label: string; variant: 'info' | 'amber' | 'success' | 'danger' }
+> = {
+  scheduled: { label: 'Agendado', variant: 'info' },
+  confirmed: { label: 'Confirmado', variant: 'amber' },
+  completed: { label: 'Concluído', variant: 'success' },
+  cancelled: { label: 'Cancelado', variant: 'danger' },
 }
 
 export default function Agenda() {
@@ -122,7 +125,7 @@ export default function Agenda() {
             >
               <Button
                 variant="outline"
-                className="bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 transition-transform active:scale-95"
+                className="border-success/40 bg-success/5 text-success hover:bg-success/10 transition-transform active:scale-95"
               >
                 <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp
               </Button>
@@ -133,7 +136,7 @@ export default function Agenda() {
       </div>
 
       <div className="grid lg:grid-cols-4 gap-6">
-        <Card className="lg:col-span-1 h-fit hover:shadow-elevation transition-shadow">
+        <Card className="lg:col-span-1 h-fit hover:shadow-md transition-shadow duration-200 ease-in-out">
           <CardContent className="p-3">
             <CalendarComponent
               mode="single"
@@ -144,7 +147,7 @@ export default function Agenda() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-3 hover:shadow-elevation transition-shadow">
+        <Card className="lg:col-span-3 hover:shadow-md transition-shadow duration-200 ease-in-out">
           <CardHeader className="border-b bg-muted/20">
             <div className="flex items-center justify-between">
               <CardTitle>Horários - {formatDateBR(date)}</CardTitle>
@@ -182,7 +185,7 @@ export default function Agenda() {
                   return (
                     <div
                       key={app.id}
-                      className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 hover:bg-muted/30 transition-colors"
+                      className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 hover:bg-muted/30 transition-colors duration-200 ease-in-out"
                     >
                       <div className="flex flex-col items-center justify-center w-20 px-2 py-1.5 rounded-md bg-accent/10 text-accent shrink-0">
                         <Clock className="h-4 w-4 mb-1" />
@@ -210,9 +213,7 @@ export default function Agenda() {
                           <p className="font-medium">{app.barber_name || '-'}</p>
                         </div>
                         <div className="text-right flex items-center justify-end gap-1">
-                          <Badge variant="outline" className={statusInfo.class}>
-                            {statusInfo.label}
-                          </Badge>
+                          <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
                           {app.status !== 'cancelled' && (
                             <Button
                               variant="ghost"
@@ -340,7 +341,7 @@ function NewBookingModal({ onCreated, barbers }: { onCreated: () => void; barber
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="bg-accent hover:bg-accent/90 text-white transition-transform active:scale-95">
+        <Button variant="amber" className="transition-transform active:scale-95">
           <Plus className="h-4 w-4 mr-2" /> Novo Agendamento
         </Button>
       </DialogTrigger>
@@ -444,13 +445,11 @@ function NewBookingModal({ onCreated, barbers }: { onCreated: () => void; barber
                         <Button
                           key={slot.time}
                           type="button"
-                          variant={selectedSlot === slot.time ? 'default' : 'outline'}
+                          variant={selectedSlot === slot.time ? 'amber' : 'outline'}
                           size="sm"
                           disabled={!slot.available}
                           className={cn(
-                            'flex flex-col items-center py-1.5 h-auto text-xs',
-                            selectedSlot === slot.time &&
-                              'bg-accent text-white font-bold ring-2 ring-accent',
+                            'flex flex-col items-center py-1.5 h-auto text-xs transition-colors duration-200 ease-in-out',
                             !slot.available &&
                               'opacity-50 bg-muted/60 cursor-not-allowed border-dashed line-through',
                           )}
@@ -461,7 +460,7 @@ function NewBookingModal({ onCreated, barbers }: { onCreated: () => void; barber
                             className={cn(
                               'text-[10px] font-normal',
                               slot.available
-                                ? 'text-emerald-600 dark:text-emerald-400 font-medium'
+                                ? 'text-success font-medium'
                                 : 'text-destructive font-medium',
                             )}
                           >
@@ -478,11 +477,13 @@ function NewBookingModal({ onCreated, barbers }: { onCreated: () => void; barber
         </div>
         <DialogFooter>
           <Button
+            variant="amber"
             onClick={handleSave}
-            disabled={loading || !selectedSlot}
-            className="bg-accent hover:bg-accent/90 text-white w-full sm:w-auto"
+            disabled={!selectedSlot}
+            loading={loading}
+            className="w-full sm:w-auto"
           >
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Confirmar Agendamento
+            Confirmar Agendamento
           </Button>
         </DialogFooter>
       </DialogContent>

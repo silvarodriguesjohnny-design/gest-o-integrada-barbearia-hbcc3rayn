@@ -155,7 +155,7 @@ export default function PublicBooking() {
 
   if (loading) {
     return (
-      <div className="relative flex items-center justify-center min-h-screen bg-background bg-[radial-gradient(ellipse_at_top,_rgba(217,119,6,0.08),_transparent_50%)]">
+      <div className="relative flex items-center justify-center min-h-screen bg-background">
         <div className="absolute top-0 left-0 right-0 h-1 barber-pole-stripes" />
         <Loader2 className="h-8 w-8 animate-spin text-accent" />
       </div>
@@ -164,15 +164,16 @@ export default function PublicBooking() {
 
   if (done) {
     return (
-      <div className="relative flex flex-col items-center justify-center min-h-screen bg-background bg-[radial-gradient(ellipse_at_top,_rgba(217,119,6,0.08),_transparent_50%)] p-6 text-center">
+      <div className="relative flex flex-col items-center justify-center min-h-screen bg-background p-6 text-center">
         <div className="absolute top-0 left-0 right-0 h-1 barber-pole-stripes" />
-        <CheckCircle2 className="h-16 w-16 text-emerald-500 mb-4 animate-bounce" />
+        <CheckCircle2 className="h-16 w-16 text-success mb-4 animate-bounce" />
         <h1 className="text-2xl font-bold">Agendamento Confirmado!</h1>
         <p className="text-muted-foreground mt-2">
           {customer?.name}, seu horário foi reservado com sucesso.
         </p>
         <Button
-          className="mt-6 bg-accent hover:bg-accent/90 text-white"
+          variant="amber"
+          className="mt-6"
           onClick={() => {
             setDone(false)
             setSelectedService(null)
@@ -199,7 +200,7 @@ export default function PublicBooking() {
     : []
 
   return (
-    <div className="relative min-h-screen bg-background bg-[radial-gradient(ellipse_at_top,_rgba(217,119,6,0.08),_transparent_50%)] p-4 md:p-8">
+    <div className="relative min-h-screen bg-background p-4 md:p-8">
       <div className="absolute top-0 left-0 right-0 h-1 barber-pole-stripes z-50" />
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center gap-3 border-b pb-4">
@@ -233,7 +234,7 @@ export default function PublicBooking() {
             {services.map((s) => (
               <Card
                 key={s.id}
-                className="cursor-pointer hover:border-accent transition-all hover:shadow-elevation"
+                className="cursor-pointer transition-all duration-200 ease-in-out hover:border-accent hover:shadow-md"
                 onClick={() => setSelectedService(s)}
               >
                 <CardContent className="flex items-center justify-between p-4">
@@ -269,9 +270,8 @@ export default function PublicBooking() {
                 <Label className="text-sm font-semibold">Selecione o Profissional</Label>
                 <div className="flex flex-wrap gap-2">
                   <Button
-                    variant={selectedBarber === null ? 'default' : 'outline'}
+                    variant={selectedBarber === null ? 'amber' : 'outline'}
                     size="sm"
-                    className={cn(selectedBarber === null && 'bg-accent text-white')}
                     onClick={() => setSelectedBarber(null)}
                   >
                     Qualquer Profissional
@@ -279,9 +279,8 @@ export default function PublicBooking() {
                   {barbers.map((b) => (
                     <Button
                       key={b}
-                      variant={selectedBarber === b ? 'default' : 'outline'}
+                      variant={selectedBarber === b ? 'amber' : 'outline'}
                       size="sm"
-                      className={cn(selectedBarber === b && 'bg-accent text-white')}
                       onClick={() => setSelectedBarber(b)}
                     >
                       {b}
@@ -325,6 +324,8 @@ export default function PublicBooking() {
                       'bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground rounded-md font-bold',
                     day_today: 'ring-2 ring-accent text-accent rounded-md',
                     day_disabled: 'text-muted-foreground/30 line-through cursor-not-allowed',
+                    head_cell: 'text-muted-foreground font-normal text-xs',
+                    caption: 'flex justify-center pt-1 relative items-center',
                     month: 'space-y-4 w-full',
                     table: 'w-full',
                   }}
@@ -363,13 +364,11 @@ export default function PublicBooking() {
                         <Button
                           key={slot.time}
                           type="button"
-                          variant={selectedSlot === slot.time ? 'default' : 'outline'}
+                          variant={selectedSlot === slot.time ? 'amber' : 'outline'}
                           size="sm"
                           disabled={!slot.available}
                           className={cn(
-                            'flex flex-col items-center py-2 h-auto text-xs transition-all',
-                            selectedSlot === slot.time &&
-                              'bg-accent text-white font-bold ring-2 ring-accent',
+                            'flex flex-col items-center py-2 h-auto text-xs transition-all duration-200 ease-in-out',
                             !slot.available &&
                               'opacity-50 bg-muted/60 cursor-not-allowed border-dashed line-through',
                           )}
@@ -380,7 +379,7 @@ export default function PublicBooking() {
                             className={cn(
                               'text-[10px] font-normal',
                               slot.available
-                                ? 'text-emerald-600 dark:text-emerald-400 font-medium'
+                                ? 'text-success font-medium'
                                 : 'text-destructive font-medium',
                             )}
                           >
@@ -396,12 +395,12 @@ export default function PublicBooking() {
 
             {selectedSlot && (
               <Button
-                className="w-full bg-accent hover:bg-accent/90 text-white font-semibold py-6 text-base shadow-lg"
-                disabled={booking}
+                variant="amber"
+                loading={booking}
+                className="w-full py-6 text-base shadow-lg"
                 onClick={handleBook}
               >
-                {booking && <Loader2 className="mr-2 h-5 w-5 animate-spin" />} Confirmar Agendamento
-                para {selectedSlot}
+                Confirmar Agendamento para {selectedSlot}
               </Button>
             )}
           </div>

@@ -49,7 +49,7 @@ const PLANS = [
 export function Pricing() {
   return (
     <section id="pricing" className="py-20 md:py-28 bg-muted/30">
-      <div className="mx-auto max-w-6xl px-4">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-14">
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
             Escolha seu plano
@@ -63,15 +63,15 @@ export function Pricing() {
             <Card
               key={plan.name}
               className={cn(
-                'relative bg-card border-border transition-all duration-300',
+                'relative border-border transition-all duration-200 ease-in-out',
                 plan.popular
-                  ? 'border-amber-500/50 shadow-lg shadow-amber-500/10 md:-translate-y-4 scale-105'
-                  : 'hover:border-amber-500/30 hover:-translate-y-1',
+                  ? 'border-accent/50 shadow-lg shadow-accent/10 md:-translate-y-4 scale-105'
+                  : 'hover:border-accent/40 hover:-translate-y-1 hover:shadow-md',
               )}
             >
               {plan.popular && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-600 px-4 py-1 text-xs font-semibold text-white">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-accent px-4 py-1 text-xs font-semibold text-accent-foreground">
                     <Crown className="h-3 w-3" /> Mais Popular
                   </span>
                 </div>
@@ -82,27 +82,20 @@ export function Pricing() {
                   <span className="text-4xl font-bold text-foreground">R$ {plan.price}</span>
                   <span className="text-muted-foreground">/mês</span>
                 </div>
-                <p className="text-sm text-amber-500 font-medium mt-1">{plan.barbers}</p>
+                <p className="text-sm text-accent font-medium mt-1">{plan.barbers}</p>
                 <p className="text-xs text-muted-foreground">{plan.extra}</p>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-3 mb-6">
                   {plan.features.map((f) => (
                     <li key={f} className="flex items-center gap-2 text-sm text-foreground">
-                      <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                      <Check className="h-4 w-4 text-success shrink-0" />
                       <span>{f}</span>
                     </li>
                   ))}
                 </ul>
                 <Link to={`/onboarding?plan=${plan.name.toLowerCase()}`}>
-                  <Button
-                    className={cn(
-                      'w-full',
-                      plan.popular
-                        ? 'bg-amber-600 hover:bg-amber-700 text-white'
-                        : 'bg-secondary hover:bg-secondary/80 text-foreground border border-border',
-                    )}
-                  >
+                  <Button variant={plan.popular ? 'amber' : 'outline'} className="w-full">
                     Teste Grátis por 30 Dias
                   </Button>
                 </Link>

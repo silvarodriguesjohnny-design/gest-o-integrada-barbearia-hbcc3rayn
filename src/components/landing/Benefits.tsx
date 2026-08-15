@@ -28,7 +28,7 @@ const BENEFITS = [
 export function Benefits() {
   return (
     <section id="benefits" className="py-20 md:py-28 bg-background">
-      <div className="mx-auto max-w-6xl px-4">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-14">
           <h2 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground">
             Tudo que sua barbearia precisa
@@ -41,11 +41,11 @@ export function Benefits() {
           {BENEFITS.map((b) => (
             <Card
               key={b.title}
-              className="bg-card border-border hover:border-amber-500/30 transition-all hover:-translate-y-1 duration-300"
+              className="border-border transition-all duration-200 ease-in-out hover:border-accent/40 hover:shadow-md hover:-translate-y-1"
             >
               <CardHeader>
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 mb-2">
-                  <b.icon className="h-6 w-6 text-amber-500" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10 mb-2">
+                  <b.icon className="h-6 w-6 text-accent" />
                 </div>
                 <CardTitle className="text-lg text-foreground">{b.title}</CardTitle>
               </CardHeader>

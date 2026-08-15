@@ -31,7 +31,9 @@ export default function TrialExpired() {
             </p>
           </div>
           <Link to="/settings">
-            <Button className="w-full bg-accent hover:bg-accent/90">Ir para Configurações</Button>
+            <Button variant="amber" className="w-full">
+              Ir para Configurações
+            </Button>
           </Link>
           <Link to="/">
             <Button variant="outline" className="w-full">
