@@ -21,6 +21,9 @@ import {
   Settings,
   LogOut,
   Download,
+  MonitorSmartphone,
+  Wallet,
+  Repeat,
 } from 'lucide-react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -37,11 +40,11 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 
 const NAV_ITEMS = [
   { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
-  { name: 'Cadastros Pendentes', path: '/admin/cadastros', icon: UserCheck },
+  { name: 'Cadastros Pendentes', path: '/admin/cadastros-pendentes', icon: UserCheck },
   { name: 'Barbearias', path: '/admin/barbearias', icon: Store },
-  { name: 'Agendamentos', path: '/admin/agendamentos', icon: CalendarDays },
-  { name: 'Clientes', path: '/admin/clientes', icon: Users },
   { name: 'Relatórios', path: '/admin/relatorios', icon: Download },
+  { name: 'Meu Caixa', path: '/admin/meu-caixa', icon: Wallet },
+  { name: 'Totem & PWA', path: '/admin/totem-pwa', icon: MonitorSmartphone },
   { name: 'Configurações', path: '/admin/configuracoes', icon: Settings },
 ]
 
@@ -53,6 +56,10 @@ export default function AdminLayout() {
   const handleSignOut = async () => {
     await signOut()
     navigate('/login')
+  }
+
+  const handleSwitchProfile = () => {
+    navigate('/selecionar-perfil')
   }
 
   return (
@@ -135,6 +142,9 @@ export default function AdminLayout() {
                     <p className="text-sm font-semibold">{profile?.full_name || 'Admin'}</p>
                     <p className="text-xs text-muted-foreground">Administrador</p>
                   </div>
+                  <DropdownMenuItem onClick={handleSwitchProfile}>
+                    <Repeat className="mr-2 h-4 w-4" /> Trocar de Perfil
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
                     onClick={handleSignOut}

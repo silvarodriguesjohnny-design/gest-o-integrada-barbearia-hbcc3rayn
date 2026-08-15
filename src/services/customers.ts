@@ -4,10 +4,11 @@ import type { Customer, CustomerWithDetails, LoyaltyCard } from '@/types'
 export async function getCustomers(
   _tenantId?: string,
 ): Promise<{ data: CustomerWithDetails[] | null; error: any }> {
-  const [custRes, loyaltyRes, apptRes] = await Promise.all([
+  const [custRes, loyaltyRes, apptRes, subRes] = await Promise.all([
     db.from('customers').select('*').order('name'),
     db.from('loyalty_cards').select('*'),
     db.from('appointments').select('customer_id, status'),
+    db.from('subscriptions').select('client_id, status').in('status', ['active']),
   ])
   if (custRes.error) return { data: null, error: custRes.error }
 
@@ -23,10 +24,16 @@ export async function getCustomers(
     }
   }
 
+  const subscriberSet = new Set<string>()
+  for (const s of subRes.data || []) {
+    if (s.status === 'active') subscriberSet.add(s.client_id)
+  }
+
   const customers: CustomerWithDetails[] = (custRes.data || []).map((c: Customer) => ({
     ...c,
     loyalty_card: loyaltyMap.get(c.id) || null,
     visit_count: visitMap.get(c.id) || 0,
+    is_subscriber: subscriberSet.has(c.id),
   }))
 
   return { data: customers, error: null }

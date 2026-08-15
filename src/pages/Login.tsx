@@ -29,7 +29,7 @@ export default function Login() {
   const [forgotMode, setForgotMode] = useState(false)
   const [resetSent, setResetSent] = useState(false)
 
-  if (!authLoading && user) return <Navigate to="/dashboard" replace />
+  if (!authLoading && user) return <Navigate to="/selecionar-perfil" replace />
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -43,7 +43,7 @@ export default function Login() {
         variant: 'destructive',
       })
     } else {
-      navigate('/dashboard')
+      navigate('/selecionar-perfil')
     }
   }
 

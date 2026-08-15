@@ -26,6 +26,9 @@ import {
   MessageCircle,
   MessageSquare,
   UserPlus,
+  Package,
+  RefreshCw,
+  Repeat,
 } from 'lucide-react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Input } from '@/components/ui/input'
@@ -44,13 +47,16 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 
 const NAV_ITEMS = [
   { name: 'Dashboard', path: '/dashboard', icon: Home },
-  { name: 'Agenda', path: '/agenda', icon: Calendar },
-  { name: 'Clientes', path: '/clientes', icon: Users },
-  { name: 'Barbeiros', path: '/barbeiros', icon: Scissors },
-  { name: 'Financeiro', path: '/financeiro', icon: DollarSign },
-  { name: 'Campanhas', path: '/campanhas', icon: Gift },
-  { name: 'Mensagens', path: '/mensagens', icon: MessageSquare },
-  { name: 'Configurações', path: '/settings', icon: Settings },
+  { name: 'Agenda', path: '/dashboard/agenda', icon: Calendar },
+  { name: 'Clientes', path: '/dashboard/clientes', icon: Users },
+  { name: 'Serviços', path: '/dashboard/servicos', icon: Scissors },
+  { name: 'Financeiro', path: '/dashboard/financeiro', icon: DollarSign },
+  { name: 'Estoque', path: '/dashboard/estoque', icon: Package },
+  { name: 'Assinaturas', path: '/dashboard/assinaturas', icon: RefreshCw },
+  { name: 'Barbeiros', path: '/dashboard/barbeiros', icon: Scissors },
+  { name: 'Campanhas', path: '/dashboard/campanhas', icon: Gift },
+  { name: 'Mensagens', path: '/dashboard/mensagens', icon: MessageSquare },
+  { name: 'Configurações', path: '/dashboard/configuracoes', icon: Settings },
 ]
 
 export default function Layout() {
@@ -61,6 +67,10 @@ export default function Layout() {
   const handleSignOut = async () => {
     await signOut()
     navigate('/login')
+  }
+
+  const handleSwitchProfile = () => {
+    navigate('/selecionar-perfil')
   }
 
   return (
@@ -90,11 +100,10 @@ export default function Layout() {
                     ...NAV_ITEMS,
                     ...(isSuperAdmin
                       ? [
-                          { name: 'Admin Financeiro', path: '/super-admin', icon: Crown },
                           {
-                            name: 'Gerenciar Usuários',
-                            path: '/gerenciar-usuarios',
-                            icon: UserPlus,
+                            name: 'Trocar de Perfil',
+                            path: '/selecionar-perfil',
+                            icon: Repeat,
                           },
                         ]
                       : []),
@@ -180,9 +189,14 @@ export default function Layout() {
                       {profile?.role || 'viewer'}
                     </p>
                   </div>
-                  <DropdownMenuItem onClick={() => navigate('/settings')}>
+                  <DropdownMenuItem onClick={() => navigate('/dashboard/configuracoes')}>
                     <Settings className="mr-2 h-4 w-4" /> Configurações
                   </DropdownMenuItem>
+                  {isSuperAdmin && (
+                    <DropdownMenuItem onClick={handleSwitchProfile}>
+                      <Repeat className="mr-2 h-4 w-4" /> Trocar de Perfil
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
                     onClick={handleSignOut}

@@ -684,6 +684,167 @@ export type Database = {
           },
         ]
       }
+      subscription_plans: {
+        Row: {
+          id: string
+          tenant_id: string
+          name: string
+          description: string | null
+          services_included: Json
+          price: number
+          prepaid_discount_pct: number
+          prepaid_months: number
+          prepaid_price: number
+          active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          tenant_id: string
+          name: string
+          description?: string | null
+          services_included?: Json
+          price?: number
+          prepaid_discount_pct?: number
+          prepaid_months?: number
+          prepaid_price?: number
+          active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          tenant_id?: string
+          name?: string
+          description?: string | null
+          services_included?: Json
+          price?: number
+          prepaid_discount_pct?: number
+          prepaid_months?: number
+          prepaid_price?: number
+          active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'subscription_plans_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          id: string
+          client_id: string
+          tenant_id: string
+          plan_id: string
+          stripe_subscription_id: string | null
+          stripe_customer_id: string | null
+          status: string
+          payment_type: string
+          start_date: string
+          end_date: string | null
+          amount_paid: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          tenant_id: string
+          plan_id: string
+          stripe_subscription_id?: string | null
+          stripe_customer_id?: string | null
+          status?: string
+          payment_type?: string
+          start_date?: string
+          end_date?: string | null
+          amount_paid?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          client_id?: string
+          tenant_id?: string
+          plan_id?: string
+          stripe_subscription_id?: string | null
+          stripe_customer_id?: string | null
+          status?: string
+          payment_type?: string
+          start_date?: string
+          end_date?: string | null
+          amount_paid?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'subscriptions_client_id_fkey'
+            columns: ['client_id']
+            isOneToOne: false
+            referencedRelation: 'customers'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'subscriptions_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'subscriptions_plan_id_fkey'
+            columns: ['plan_id']
+            isOneToOne: false
+            referencedRelation: 'subscription_plans'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      subscription_invoices: {
+        Row: {
+          id: string
+          subscription_id: string | null
+          stripe_invoice_id: string | null
+          amount: number
+          status: string
+          paid_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          subscription_id?: string | null
+          stripe_invoice_id?: string | null
+          amount?: number
+          status?: string
+          paid_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          subscription_id?: string | null
+          stripe_invoice_id?: string | null
+          amount?: number
+          status?: string
+          paid_at?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'subscription_invoices_subscription_id_fkey'
+            columns: ['subscription_id']
+            isOneToOne: false
+            referencedRelation: 'subscriptions'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       tenants: {
         Row: {
           bairro: string | null
@@ -770,6 +931,53 @@ export type Database = {
           whatsapp_phone?: string | null
         }
         Relationships: []
+      }
+      totem_config: {
+        Row: {
+          app_name: string
+          background_color: string
+          created_at: string
+          icon_192_url: string | null
+          icon_512_url: string | null
+          id: string
+          slug: string
+          tenant_id: string
+          theme_color: string
+          updated_at: string
+        }
+        Insert: {
+          app_name: string
+          background_color?: string
+          created_at?: string
+          icon_192_url?: string | null
+          icon_512_url?: string | null
+          id?: string
+          slug: string
+          tenant_id: string
+          theme_color?: string
+          updated_at?: string
+        }
+        Update: {
+          app_name?: string
+          background_color?: string
+          created_at?: string
+          icon_192_url?: string | null
+          icon_512_url?: string | null
+          id?: string
+          slug?: string
+          tenant_id?: string
+          theme_color?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'totem_config_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
       }
       transactions: {
         Row: {

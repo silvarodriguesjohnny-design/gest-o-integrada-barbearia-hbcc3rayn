@@ -29,16 +29,20 @@ Deno.serve(async (req: Request) => {
     const { action } = body
 
     if (action === 'get_tenant') {
-      const { tenant_id } = body
-      const { data: tenant } = await supabase
-        .from('tenants')
-        .select('*')
-        .eq('id', tenant_id)
-        .single()
+      const { tenant_id, slug } = body
+      let tenant = null
+      if (slug) {
+        const { data } = await supabase.from('tenants').select('*').eq('slug', slug).maybeSingle()
+        tenant = data
+      } else {
+        const { data } = await supabase.from('tenants').select('*').eq('id', tenant_id).single()
+        tenant = data
+      }
+      const effectiveId = tenant?.id || tenant_id
       const { data: services } = await supabase
         .from('services')
         .select('*')
-        .eq('tenant_id', tenant_id)
+        .eq('tenant_id', effectiveId)
       return new Response(JSON.stringify({ tenant, services: services || [] }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })

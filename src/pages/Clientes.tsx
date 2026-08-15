@@ -240,6 +240,11 @@ export default function Clientes() {
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           {customer.name}
+                          {customer.is_subscriber && (
+                            <Badge className="bg-accent/15 text-accent border-accent/30 text-xs">
+                              Assinante
+                            </Badge>
+                          )}
                           {stamps >= 10 && (
                             <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
                           )}

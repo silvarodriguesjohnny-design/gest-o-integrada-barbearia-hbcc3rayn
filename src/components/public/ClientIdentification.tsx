@@ -10,6 +10,7 @@ import {
   createPublicCustomer,
   type PublicCustomer,
 } from '@/services/public-booking'
+import { formatCpf, isValidCpf } from '@/lib/masks'
 
 interface Props {
   tenantId: string
@@ -41,22 +42,26 @@ export function ClientIdentification({ tenantId, onIdentified }: Props) {
   }, [mode])
 
   const handleExisting = async () => {
-    if (!cpf) return setError('Informe seu CPF')
+    const cleanCpf = cpf.replace(/\D/g, '')
+    if (!cleanCpf) return setError('Informe seu CPF')
+    if (!isValidCpf(cleanCpf)) return setError('CPF inválido. Verifique os dígitos.')
     setLoading(true)
     setError('')
-    const { data } = await identifyCustomer(tenantId, cpf)
+    const { data } = await identifyCustomer(tenantId, cleanCpf)
     setLoading(false)
     if (data?.customer) onIdentified(data.customer)
     else setError('CPF não encontrado. Tente "Primeira vez".')
   }
 
   const handleNew = async () => {
-    if (!cpf || !name || !phone) return setError('Preencha CPF, nome e telefone')
+    const cleanCpf = cpf.replace(/\D/g, '')
+    if (!cleanCpf || !name || !phone) return setError('Preencha CPF, nome e telefone')
+    if (!isValidCpf(cleanCpf)) return setError('CPF inválido. Verifique os dígitos.')
     setLoading(true)
     setError('')
     const { data } = await createPublicCustomer({
       tenant_id: tenantId,
-      cpf,
+      cpf: cleanCpf,
       name,
       phone,
       email,
@@ -64,7 +69,7 @@ export function ClientIdentification({ tenantId, onIdentified }: Props) {
     })
     setLoading(false)
     if (data?.customer) onIdentified(data.customer)
-    else setError('Erro ao cadastrar. Tente novamente.')
+    else setError('Erro ao cadastrar. Verifique se o CPF já não está cadastrado.')
   }
 
   const toggleChannel = (ch: string) =>
@@ -126,12 +131,15 @@ export function ClientIdentification({ tenantId, onIdentified }: Props) {
             <Label>CPF</Label>
             <Input
               value={cpf}
-              onChange={(e) => setCpf(e.target.value)}
+              onChange={(e) => setCpf(formatCpf(e.target.value))}
               placeholder="000.000.000-00"
               inputMode="numeric"
               autoComplete="off"
               className="tablet-input h-12 md:h-14 text-base md:text-lg"
             />
+            {cpf.replace(/\D/g, '').length === 11 && !isValidCpf(cpf) && (
+              <p className="text-xs text-destructive">CPF inválido</p>
+            )}
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button
@@ -149,12 +157,15 @@ export function ClientIdentification({ tenantId, onIdentified }: Props) {
             <Label>CPF *</Label>
             <Input
               value={cpf}
-              onChange={(e) => setCpf(e.target.value)}
+              onChange={(e) => setCpf(formatCpf(e.target.value))}
               placeholder="000.000.000-00"
               inputMode="numeric"
               autoComplete="off"
               className="tablet-input h-12 md:h-14 text-base md:text-lg"
             />
+            {cpf.replace(/\D/g, '').length === 11 && !isValidCpf(cpf) && (
+              <p className="text-xs text-destructive">CPF inválido</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label>Nome completo *</Label>

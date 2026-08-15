@@ -55,6 +55,7 @@ export interface Customer {
 export interface CustomerWithDetails extends Customer {
   loyalty_card?: LoyaltyCard | null
   visit_count?: number
+  is_subscriber?: boolean
 }
 
 export interface Service {
@@ -219,5 +220,51 @@ export interface MessagingConfig {
   channel: string
   config_json: Record<string, unknown>
   is_active: boolean
+  created_at: string
+}
+
+// --- Assinaturas (Fase 2) ---
+
+export interface SubscriptionPlan {
+  id: string
+  tenant_id: string
+  name: string
+  description: string | null
+  services_included: string[]
+  price: number
+  prepaid_discount_pct: number
+  prepaid_months: number
+  prepaid_price: number
+  active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export type SubscriptionStatus = 'active' | 'cancelled' | 'expired' | 'suspended'
+export type SubscriptionPaymentType = 'monthly' | 'prepaid'
+
+export interface Subscription {
+  id: string
+  client_id: string
+  tenant_id: string
+  plan_id: string
+  stripe_subscription_id: string | null
+  stripe_customer_id: string | null
+  status: SubscriptionStatus
+  payment_type: SubscriptionPaymentType
+  start_date: string
+  end_date: string | null
+  amount_paid: number
+  created_at: string
+  updated_at: string
+}
+
+export interface SubscriptionInvoice {
+  id: string
+  subscription_id: string | null
+  stripe_invoice_id: string | null
+  amount: number
+  status: 'paid' | 'pending' | 'failed'
+  paid_at: string | null
   created_at: string
 }

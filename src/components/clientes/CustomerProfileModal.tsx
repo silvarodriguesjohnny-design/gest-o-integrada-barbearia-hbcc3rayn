@@ -7,11 +7,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { Scissors, Gift } from 'lucide-react'
+import { Scissors, Gift, BadgeCheck } from 'lucide-react'
 import { redeemReward } from '@/services/loyalty'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import type { CustomerWithDetails } from '@/types'
+import { formatCpf } from '@/lib/masks'
 
 export function CustomerProfileModal({
   customer,
@@ -44,6 +45,11 @@ export function CustomerProfileModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3 text-2xl font-serif">
             {customer.name}
+            {customer.is_subscriber && (
+              <Badge className="bg-accent/15 text-accent border-accent/30">
+                <BadgeCheck className="h-3.5 w-3.5 mr-1" /> Assinante
+              </Badge>
+            )}
             {stamps >= 10 && (
               <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">
                 VIP
@@ -52,6 +58,11 @@ export function CustomerProfileModal({
           </DialogTitle>
         </DialogHeader>
         <div className="grid gap-6 py-4">
+          {customer.cpf && (
+            <div className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">CPF:</span> {formatCpf(customer.cpf)}
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-muted/50 border p-4 rounded-lg flex flex-col justify-center">
               <div className="text-xs text-muted-foreground mb-1 uppercase font-semibold">

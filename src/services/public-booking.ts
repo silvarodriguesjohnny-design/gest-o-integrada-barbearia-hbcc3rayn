@@ -1,5 +1,7 @@
 import { supabase } from '@/lib/supabase/client'
+import { publicSupabase } from '@/lib/supabase/public-client'
 import { formatLocalDateYYYYMMDD } from '@/lib/date-utils'
+import type { SubscriptionPlan } from '@/types'
 
 export interface PublicTenant {
   id: string
@@ -45,9 +47,9 @@ export interface PublicBarberSchedule {
   end_time: string
 }
 
-export async function getTenantData(tenantId: string) {
+export async function getTenantData(tenantId: string, slug?: string) {
   const { data, error } = await supabase.functions.invoke('public-booking', {
-    body: { action: 'get_tenant', tenant_id: tenantId },
+    body: { action: 'get_tenant', tenant_id: tenantId, slug },
   })
   return { data: data as { tenant: PublicTenant; services: PublicService[] } | null, error }
 }
@@ -136,6 +138,55 @@ export async function getAppointmentByToken(
 export async function confirmAppointmentByToken(token: string): Promise<{ data: any; error: any }> {
   const { data, error } = await supabase.functions.invoke('public-booking', {
     body: { action: 'confirm_appointment', token },
+  })
+  return { data, error }
+}
+
+/**
+ * Lista os planos de assinatura ativos de uma barbearia para o fluxo público.
+ * Usa o client público (anon) — a RLS permite leitura de planos ativos.
+ */
+export async function getPublicSubscriptionPlans(
+  tenantId: string,
+): Promise<{ data: SubscriptionPlan[] | null; error: any }> {
+  const { data, error } = await publicSupabase
+    .from('subscription_plans')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('active', true)
+    .order('price', { ascending: true })
+  if (error) return { data: null, error }
+  const plans: SubscriptionPlan[] = (data || []).map((row: any) => ({
+    id: row.id,
+    tenant_id: row.tenant_id,
+    name: row.name,
+    description: row.description,
+    services_included: Array.isArray(row.services_included)
+      ? row.services_included.filter((v: unknown): v is string => typeof v === 'string')
+      : [],
+    price: Number(row.price) || 0,
+    prepaid_discount_pct: Number(row.prepaid_discount_pct) || 0,
+    prepaid_months: Number(row.prepaid_months) || 0,
+    prepaid_price: Number(row.prepaid_price) || 0,
+    active: !!row.active,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  }))
+  return { data: plans, error }
+}
+
+/**
+ * Inicia o fluxo de checkout do Stripe para contratação de assinatura no fluxo público.
+ */
+export async function startPublicSubscriptionCheckout(input: {
+  plan_id: string
+  client_id: string
+  payment_type: 'monthly' | 'prepaid'
+  success_url?: string
+  cancel_url?: string
+}): Promise<{ data: { checkout_url: string } | null; error: any }> {
+  const { data, error } = await supabase.functions.invoke('stripe-create-checkout', {
+    body: input,
   })
   return { data, error }
 }
