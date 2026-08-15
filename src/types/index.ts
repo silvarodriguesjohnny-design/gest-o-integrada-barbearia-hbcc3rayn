@@ -156,6 +156,7 @@ export interface Barber {
   created_at: string
   tenant_id: string | null
   is_active?: boolean
+  public_token?: string | null
 }
 
 export interface BarberSchedule {

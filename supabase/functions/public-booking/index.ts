@@ -128,6 +128,18 @@ Deno.serve(async (req: Request) => {
 
     if (action === 'create_booking') {
       const { tenant_id, service_id, customer_id, barber_name, date, time } = body
+      // Resolve barber_id from barber_name within the tenant so the new
+      // appointment is associated with the barber for the public agenda.
+      let barber_id: string | null = null
+      if (barber_name && tenant_id) {
+        const { data: barberRow } = await supabase
+          .from('barbers')
+          .select('id')
+          .eq('tenant_id', tenant_id)
+          .eq('name', barber_name)
+          .maybeSingle()
+        barber_id = barberRow?.id ?? null
+      }
 
       const { data: service } = await supabase
         .from('services')
@@ -209,6 +221,7 @@ Deno.serve(async (req: Request) => {
           service_id,
           customer_id,
           barber_name: barber_name || null,
+          barber_id,
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
           status: 'scheduled',

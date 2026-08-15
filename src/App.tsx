@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from '@/hooks/use-auth'
 import Landing from './pages/Landing'
 import PublicBooking from './pages/PublicBooking'
 import ConfirmAppointment from './pages/ConfirmAppointment'
+import BarberPublicAgenda from './pages/BarberPublicAgenda'
 import Index from './pages/Index'
 import Clientes from './pages/Clientes'
 import Barbeiros from './pages/Barbeiros'
@@ -76,6 +77,7 @@ const App = () => (
           <Route path="/login" element={<Login />} />
           <Route path="/book/:tenantId" element={<PublicBooking />} />
           <Route path="/confirmar/:token" element={<ConfirmAppointment />} />
+          <Route path="/barbeiro/:token" element={<BarberPublicAgenda />} />
           <Route path="/onboarding" element={<Onboarding />} />
           <Route path="/cadastro" element={<Onboarding />} />
           <Route path="/trial-expired" element={<TrialExpired />} />

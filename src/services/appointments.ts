@@ -80,12 +80,25 @@ export async function createAppointment(data: {
     }
   }
 
+  // Resolve barber_id from barber_name so the public barber agenda can show
+  // this appointment. Only matches within the current tenant (RLS scopes).
+  let barber_id: string | null = null
+  if (data.barber_name) {
+    const { data: barberRow } = await db
+      .from('barbers')
+      .select('id')
+      .eq('name', data.barber_name)
+      .maybeSingle()
+    barber_id = barberRow?.id ?? null
+  }
+
   const { data: result, error } = await db
     .from('appointments')
     .insert({
       customer_id: data.customer_id,
       service_id: data.service_id,
       barber_name: data.barber_name,
+      barber_id,
       status: 'scheduled',
       start_time: start.toISOString(),
       end_time: end.toISOString(),
@@ -150,9 +163,25 @@ export async function updateAppointment(
     status?: string
   },
 ) {
+  // Keep barber_id in sync when barber_name changes so the public barber
+  // agenda continues to show the appointment under the right professional.
+  let resolvedUpdates: Record<string, unknown> = { ...updates }
+  if ('barber_name' in updates) {
+    if (updates.barber_name) {
+      const { data: barberRow } = await db
+        .from('barbers')
+        .select('id')
+        .eq('name', updates.barber_name)
+        .maybeSingle()
+      resolvedUpdates.barber_id = barberRow?.id ?? null
+    } else {
+      resolvedUpdates.barber_id = null
+    }
+  }
+
   const { data: result, error } = await db
     .from('appointments')
-    .update(updates)
+    .update(resolvedUpdates)
     .eq('id', id)
     .select(
       '*, customer:customers(id, name, phone), service:services(id, name, price, duration_minutes)',

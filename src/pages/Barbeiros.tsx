@@ -23,7 +23,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { Plus, Pencil, Trash2, Loader2, Scissors, Clock, Power, ShieldAlert } from 'lucide-react'
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Loader2,
+  Scissors,
+  Clock,
+  Power,
+  ShieldAlert,
+  Link2,
+  Copy,
+  Check,
+} from 'lucide-react'
 import {
   getBarbers,
   createBarber,
@@ -45,6 +57,7 @@ export default function Barbeiros() {
   const [editingBarber, setEditingBarber] = useState<Barber | null>(null)
   const [deletingBarber, setDeletingBarber] = useState<Barber | null>(null)
   const [schedulingBarber, setSchedulingBarber] = useState<Barber | null>(null)
+  const [linkBarber, setLinkBarber] = useState<Barber | null>(null)
   const { toast } = useToast()
 
   const load = () => {
@@ -159,6 +172,15 @@ export default function Barbeiros() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8"
+                        title="Link público da agenda"
+                        onClick={() => setLinkBarber(barber)}
+                      >
+                        <Link2 className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
                         title="Horários de trabalho"
                         onClick={() => setSchedulingBarber(barber)}
                       >
@@ -212,6 +234,8 @@ export default function Barbeiros() {
         open={!!schedulingBarber}
         onOpenChange={(v) => !v && setSchedulingBarber(null)}
       />
+      <PublicLinkDialog barber={linkBarber} onOpenChange={(v) => !v && setLinkBarber(null)} />
+
       <AlertDialog open={!!deletingBarber} onOpenChange={(v) => !v && setDeletingBarber(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -300,6 +324,131 @@ function BarberFormDialog({
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Salvar
           </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function buildPublicBarberUrl(token: string) {
+  const origin = typeof window !== 'undefined' ? window.location.origin : ''
+  return `${origin}/barbeiro/${token}`
+}
+
+/** Inline cell showing a short link + copy/open actions. */
+function PublicLinkCell({ token }: { token: string | null | undefined }) {
+  const { toast } = useToast()
+  const [copied, setCopied] = useState(false)
+
+  if (!token) {
+    return <span className="text-xs text-muted-foreground">Indisponível</span>
+  }
+
+  const url = buildPublicBarberUrl(token)
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      toast({ title: 'Link copiado!' })
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      toast({ title: 'Não foi possível copiar', variant: 'destructive' })
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2">
+      <a
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-xs text-accent hover:underline truncate max-w-[160px] sm:max-w-[220px] flex items-center gap-1"
+        title={url}
+      >
+        <Link2 className="h-3.5 w-3.5 shrink-0" />
+        <span className="truncate">/barbeiro/{token.slice(0, 8)}…</span>
+      </a>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 shrink-0"
+        title="Copiar link"
+        onClick={handleCopy}
+      >
+        {copied ? (
+          <Check className="h-3.5 w-3.5 text-emerald-600" />
+        ) : (
+          <Copy className="h-3.5 w-3.5" />
+        )}
+      </Button>
+    </div>
+  )
+}
+
+/** Dialog with the full public link for a barber, copy/open actions. */
+function PublicLinkDialog({
+  barber,
+  onOpenChange,
+}: {
+  barber: Barber | null
+  onOpenChange: (v: boolean) => void
+}) {
+  const { toast } = useToast()
+  const [copied, setCopied] = useState(false)
+  const token = barber?.public_token
+  const url = token ? buildPublicBarberUrl(token) : ''
+
+  useEffect(() => {
+    setCopied(false)
+  }, [barber])
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      toast({ title: 'Link copiado!', description: barber?.name })
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      toast({ title: 'Não foi possível copiar', variant: 'destructive' })
+    }
+  }
+
+  return (
+    <Dialog open={!!barber} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[480px]">
+        <DialogHeader>
+          <DialogTitle className="font-serif text-2xl flex items-center gap-2">
+            <Link2 className="h-5 w-5 text-accent" /> Link público da agenda
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <p className="text-sm text-muted-foreground">
+            Compartilhe este link com <strong className="text-foreground">{barber?.name}</strong>.
+            Quem acessar verá a agenda dele (hoje e futuros), sem precisar de login.
+          </p>
+          <div className="flex items-center gap-2">
+            <Input readOnly value={url} className="text-xs" onFocus={(e) => e.target.select()} />
+            <Button
+              className="bg-accent hover:bg-accent/90 text-white shrink-0"
+              onClick={handleCopy}
+            >
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4 mr-2" /> Copiado!
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4 mr-2" /> Copiar
+                </>
+              )}
+            </Button>
+          </div>
+          <a href={url} target="_blank" rel="noopener noreferrer" className="block">
+            <Button variant="outline" className="w-full">
+              <Link2 className="h-4 w-4 mr-2" /> Abrir agenda
+            </Button>
+          </a>
         </div>
       </DialogContent>
     </Dialog>

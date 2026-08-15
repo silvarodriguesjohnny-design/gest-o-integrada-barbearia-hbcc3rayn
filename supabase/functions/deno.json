@@ -1,15 +1,15 @@
 {
   "_versions": {
-    "send-notifications": 29,
+    "send-notifications": 32,
     "tenant-billing": 4,
-    "ai-whatsapp": 24,
+    "ai-whatsapp": 27,
     "invite-user": 3,
-    "send-email": 10,
-    "test-messaging": 25,
-    "send-appointment-notification": 26,
-    "public-booking": 27,
+    "send-email": 13,
+    "test-messaging": 28,
+    "send-appointment-notification": 29,
+    "public-booking": 30,
     "create-operator": 3,
-    "approve-tenant": 11,
-    "send-manual-message": 24
+    "approve-tenant": 14,
+    "send-manual-message": 27
   }
 }

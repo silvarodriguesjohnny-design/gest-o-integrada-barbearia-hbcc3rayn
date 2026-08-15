@@ -2,7 +2,7 @@ import { db } from './db'
 import type { Barber } from '@/types'
 
 export async function getBarbers(): Promise<{ data: Barber[] | null; error: any }> {
-  const { data, error } = await db.from('barbers').select('*').order('name')
+  const { data, error } = await db.from('barbers').select('*, public_token').order('name')
   return { data: data as Barber[] | null, error }
 }
 

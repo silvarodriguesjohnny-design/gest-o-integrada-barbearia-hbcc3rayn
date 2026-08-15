@@ -507,27 +507,36 @@ export type Database = {
       }
       products: {
         Row: {
+          cost_price: number | null
           created_at: string | null
           description: string | null
           id: string
+          min_stock: number
           name: string
           price: number | null
+          stock_quantity: number
           tenant_id: string | null
         }
         Insert: {
+          cost_price?: number | null
           created_at?: string | null
           description?: string | null
           id?: string
+          min_stock?: number
           name: string
           price?: number | null
+          stock_quantity?: number
           tenant_id?: string | null
         }
         Update: {
+          cost_price?: number | null
           created_at?: string | null
           description?: string | null
           id?: string
+          min_stock?: number
           name?: string
           price?: number | null
+          stock_quantity?: number
           tenant_id?: string | null
         }
         Relationships: []
@@ -607,6 +616,54 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: 'services_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      stock_movements: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          movement_type: Database['public']['Enums']['stock_movement_type']
+          product_id: string
+          quantity: number
+          reason: string
+          tenant_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          movement_type: Database['public']['Enums']['stock_movement_type']
+          product_id: string
+          quantity: number
+          reason?: string
+          tenant_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          movement_type?: Database['public']['Enums']['stock_movement_type']
+          product_id?: string
+          quantity?: number
+          reason?: string
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'stock_movements_product_id_fkey'
+            columns: ['product_id']
+            isOneToOne: false
+            referencedRelation: 'products'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'stock_movements_tenant_id_fkey'
             columns: ['tenant_id']
             isOneToOne: false
             referencedRelation: 'tenants'
@@ -768,11 +825,36 @@ export type Database = {
       }
       get_user_tenant_id: { Args: never; Returns: string }
       is_super_admin: { Args: never; Returns: boolean }
+      register_stock_movement: {
+        Args: {
+          p_movement_type: Database['public']['Enums']['stock_movement_type']
+          p_product_id: string
+          p_quantity: number
+          p_reason?: string
+        }
+        Returns: {
+          created_at: string
+          created_by: string | null
+          id: string
+          movement_type: Database['public']['Enums']['stock_movement_type']
+          product_id: string
+          quantity: number
+          reason: string
+          tenant_id: string | null
+        }
+        SetofOptions: {
+          from: '*'
+          to: 'stock_movements'
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       trigger_send_notifications: { Args: never; Returns: undefined }
     }
     Enums: {
       appointment_status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled'
       plan_type: 'essential' | 'pro' | 'elite'
+      stock_movement_type: 'entrada' | 'saida'
       subscription_type: 'trial' | 'active' | 'past_due'
       transaction_type: 'income' | 'expense'
       user_role: 'admin' | 'operator' | 'viewer'
@@ -903,6 +985,7 @@ export const Constants = {
     Enums: {
       appointment_status: ['scheduled', 'confirmed', 'completed', 'cancelled'],
       plan_type: ['essential', 'pro', 'elite'],
+      stock_movement_type: ['entrada', 'saida'],
       subscription_type: ['trial', 'active', 'past_due'],
       transaction_type: ['income', 'expense'],
       user_role: ['admin', 'operator', 'viewer'],
