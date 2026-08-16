@@ -47,6 +47,7 @@ export default function AdminStripeConfig() {
 
   useEffect(() => {
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleSave = async () => {

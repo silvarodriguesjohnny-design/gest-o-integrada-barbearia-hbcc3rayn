@@ -85,8 +85,8 @@ export async function getAdminDashboardData(): Promise<{
   ])
 
   if (apptRes.error) return { data: null, error: apptRes.error }
-  if (loyaltyRes.error) return { data: null, error: loyaltyRes.error }
-
+  // loyalty_cards/pending_tenants são não-fatais: se falharem (ex.: RLS),
+  // o dashboard ainda renderiza com zeros/listas vazias.
   const allAppointments: AppointmentWithRelations[] = apptRes.data || []
   const loyaltyCards: any[] = loyaltyRes.data || []
   const pendingTenants: any[] = pendingRes.data || []

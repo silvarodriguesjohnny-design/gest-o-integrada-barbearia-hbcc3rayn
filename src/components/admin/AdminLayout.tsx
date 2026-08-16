@@ -38,6 +38,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 
 const NAV_ITEMS = [
   { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
@@ -161,7 +162,9 @@ export default function AdminLayout() {
           </header>
           <div className="flex-1 overflow-y-auto p-4 md:p-8 animate-fade-in">
             <div className="page-container">
-              <Outlet />
+              <ErrorBoundary>
+                <Outlet />
+              </ErrorBoundary>
             </div>
           </div>
         </main>

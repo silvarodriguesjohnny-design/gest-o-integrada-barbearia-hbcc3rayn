@@ -5,6 +5,7 @@ import {
   useState,
   useCallback,
   useMemo,
+  useRef,
   ReactNode,
 } from 'react'
 import { User, Session } from '@supabase/supabase-js'
@@ -41,6 +42,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [tenant, setTenant] = useState<Tenant | null>(null)
   const [loading, setLoading] = useState(true)
+  // Vira true assim que a primeira sessão é resolvida por getSession().
+  // Evita uma janela inicial onde loading=false e user=null (o que faria
+  // as guards redirecionarem para /login ou / antes do session check terminar).
+  const sessionLoaded = useRef(false)
 
   const fetchProfile = useCallback(async (uid: string) => {
     try {
@@ -81,6 +86,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
+      sessionLoaded.current = true
+      // Sem sessão: libera o loading (não há profile para carregar).
+      if (!session) setLoading(false)
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -93,7 +101,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // profile ainda é null, reabrindo a janela que redireciona as guards.
       setLoading(true)
       fetchProfile(user.id)
-    } else {
+    } else if (sessionLoaded.current) {
+      // Só libera o loading quando já sabemos o estado da sessão — nunca
+      // durante a janela inicial (antes de getSession resolver), evitando
+      // que as guards redirecionem prematuro para /login ou /.
       setProfile(null)
       setTenant(null)
       setLoading(false)

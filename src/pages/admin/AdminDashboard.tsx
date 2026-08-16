@@ -32,6 +32,7 @@ import {
   Ban,
   ArrowRight,
   UserCheck,
+  RefreshCw,
 } from 'lucide-react'
 import { getAdminDashboardData } from '@/services/admin-dashboard'
 import { updateAppointmentStatus, cancelAppointment } from '@/services/appointments'
@@ -75,7 +76,8 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     load()
-  }, [load])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleQuickAction = async (
     appt: AppointmentWithRelations,
@@ -113,7 +115,39 @@ export default function AdminDashboard() {
     )
   }
 
-  const d = data!
+  // Se o carregamento falhou (data veio nulo), mostra um estado de erro
+  // em vez de quebrar a renderização acessando propriedades de null.
+  if (!data) {
+    return (
+      <div className="space-y-6 animate-fade-in-up">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">
+            Visão geral da plataforma —{' '}
+            {new Date().toLocaleDateString('pt-BR', {
+              weekday: 'long',
+              day: '2-digit',
+              month: 'long',
+            })}
+          </p>
+        </div>
+        <Card>
+          <CardContent className="pt-6 text-center space-y-3">
+            <XCircle className="h-10 w-10 text-destructive mx-auto" />
+            <h2 className="text-xl font-semibold">Não foi possível carregar o dashboard</h2>
+            <p className="text-muted-foreground text-sm">
+              Ocorreu um erro ao buscar os dados. Tente novamente.
+            </p>
+            <Button variant="amber" onClick={load}>
+              <RefreshCw className="h-4 w-4 mr-2" /> Tentar novamente
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  const d = data
   const maxChartValue = Math.max(
     1,
     ...d.chart7Days.map((c) => c.confirmed + c.completed + c.cancelled + c.scheduled),
@@ -373,7 +407,10 @@ export default function AdminDashboard() {
                   </TableRow>
                 ) : (
                   d.upcomingAppointments.map((appt) => {
-                    const meta = STATUS_META[appt.status]
+                    const meta = STATUS_META[appt.status] || {
+                      label: appt.status,
+                      variant: 'outline' as const,
+                    }
                     const isLoading =
                       actionLoading === appt.id + 'confirm' ||
                       actionLoading === appt.id + 'complete' ||
