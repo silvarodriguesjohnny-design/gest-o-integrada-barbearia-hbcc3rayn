@@ -44,6 +44,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { NotificationBell } from '@/components/NotificationBell'
 import { ThemeToggle } from '@/components/ThemeToggle'
+import { Toaster as Sonner } from '@/components/ui/sonner'
 
 const NAV_ITEMS = [
   { name: 'Dashboard', path: '/dashboard', icon: Home },
@@ -214,6 +215,9 @@ export default function Layout() {
           </div>
         </main>
       </div>
+      {/* Toaster do sonner, montado apenas nos layouts internos (a Landing
+        pública não precisa dele e o sonner v2 quebra com radix Slot). */}
+      <Sonner />
     </SidebarProvider>
   )
 }
