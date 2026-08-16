@@ -7,7 +7,7 @@ import {
   buildWaMeLink,
 } from '../_shared/evolution-api.ts'
 import { formatBrasiliaDateTime } from '../_shared/datetime.ts'
-import { isStripeConfigured } from '../_shared/stripe.ts'
+import { isStripeConfigured } from './stripe.ts'
 
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

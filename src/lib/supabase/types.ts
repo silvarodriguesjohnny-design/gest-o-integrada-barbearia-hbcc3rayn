@@ -518,6 +518,27 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_secrets: {
+        Row: {
+          key: string
+          updated_at: string
+          updated_by: string | null
+          value: string
+        }
+        Insert: {
+          key: string
+          updated_at?: string
+          updated_by?: string | null
+          value: string
+        }
+        Update: {
+          key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: string
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           cost_price: number | null
@@ -683,6 +704,27 @@ export type Database = {
             referencedColumns: ['id']
           },
         ]
+      }
+      stripe_webhook_events: {
+        Row: {
+          event_id: string | null
+          event_type: string
+          id: string
+          received_at: string
+        }
+        Insert: {
+          event_id?: string | null
+          event_type: string
+          id?: string
+          received_at?: string
+        }
+        Update: {
+          event_id?: string | null
+          event_type?: string
+          id?: string
+          received_at?: string
+        }
+        Relationships: []
       }
       subscription_invoices: {
         Row: {

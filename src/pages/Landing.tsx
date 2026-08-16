@@ -2,6 +2,7 @@ import { Link, Navigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Scissors } from 'lucide-react'
 import { Hero } from '@/components/landing/Hero'
+import { LostRevenue } from '@/components/landing/LostRevenue'
 import { Benefits } from '@/components/landing/Benefits'
 import { Testimonials } from '@/components/landing/Testimonials'
 import { Pricing } from '@/components/landing/Pricing'
@@ -57,6 +58,7 @@ export default function Landing() {
       </header>
 
       <Hero />
+      <LostRevenue />
       <Benefits />
       <Testimonials />
       <Pricing />
