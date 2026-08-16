@@ -398,6 +398,7 @@ Deno.serve(async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err: any) {
+    console.error('[public-booking] error:', err)
     return new Response(JSON.stringify({ error: err.message || 'Internal server error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

@@ -43,11 +43,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true)
 
   const fetchProfile = useCallback(async (uid: string) => {
-    const { data } = await db.from('profiles').select('*, tenant:tenants(*)').eq('id', uid).single()
-    if (data) {
-      const { tenant: t, ...profileData } = data
-      setProfile(profileData as Profile)
-      setTenant(t as Tenant | null)
+    try {
+      const { data } = await db
+        .from('profiles')
+        .select('*, tenant:tenants(*)')
+        .eq('id', uid)
+        .single()
+      if (data) {
+        const { tenant: t, ...profileData } = data
+        setProfile(profileData as Profile)
+        setTenant(t as Tenant | null)
+      } else {
+        setProfile(null)
+        setTenant(null)
+      }
+    } catch {
+      // Em caso de erro, garante que a app não fique presa no spinner:
+      // profile segue null e o loading é liberado.
+      setProfile(null)
+      setTenant(null)
+    } finally {
+      setLoading(false)
     }
   }, [])
 
@@ -57,22 +73,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
-      setLoading(false)
+      // Não setamos loading=false aqui: o carregamento do profile
+      // (no useEffect abaixo) é quem libera o loading, evitando uma
+      // janela onde loading=false mas profile=null — o que faria as
+      // guards (SuperAdminRoute/TenantRoute) redirecionarem prematuro.
     })
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setUser(session?.user ?? null)
-      setLoading(false)
     })
     return () => subscription.unsubscribe()
   }, [])
 
   useEffect(() => {
     if (user) {
+      // Re-arma o loading a cada (re)carregamento de profile: ele só volta
+      // para false após o profile ser carregado (ou falhar) — ver fetchProfile.
+      // Sem isso, um novo login (após logout) deixaria loading=false enquanto
+      // profile ainda é null, reabrindo a janela que redireciona as guards.
+      setLoading(true)
       fetchProfile(user.id)
     } else {
       setProfile(null)
       setTenant(null)
+      setLoading(false)
     }
   }, [user, fetchProfile])
 
