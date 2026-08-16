@@ -31,11 +31,6 @@ import {
   Plus,
   Filter,
   X,
-  History,
-  PackagePlus,
-  SlidersHorizontal,
-  Package,
-  AlertTriangle,
   Wallet,
 } from 'lucide-react'
 import { AddExpenseDialog } from '@/components/financeiro/AddExpenseDialog'
@@ -52,9 +47,6 @@ import { generateFinanceiroPDF } from '@/lib/pdf-report'
 import { generateFinanceiroExcel } from '@/lib/excel-export'
 import { AddServiceDialog } from '@/components/financeiro/AddServiceDialog'
 import { AddProductDialog } from '@/components/financeiro/AddProductDialog'
-import { StockEntryDialog } from '@/components/financeiro/StockEntryDialog'
-import { StockAdjustDialog } from '@/components/financeiro/StockAdjustDialog'
-import { StockHistoryDialog } from '@/components/financeiro/StockHistoryDialog'
 import type { Transaction, Service, CustomerWithDetails, Product } from '@/types'
 
 interface CartItem {
@@ -65,7 +57,7 @@ interface CartItem {
 
 export default function Financeiro() {
   const { toast } = useToast()
-  const { tenant, profile } = useAuth()
+  const { tenant } = useAuth()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [services, setServices] = useState<Service[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -82,12 +74,6 @@ export default function Financeiro() {
   const [showAddProduct, setShowAddProduct] = useState(false)
   const [showAddExpense, setShowAddExpense] = useState(false)
 
-  // Controle de estoque (apenas admin / barbeiro chefe)
-  const isStockManager = profile?.role === 'admin' || !!profile?.is_super_admin
-  const [stockProduct, setStockProduct] = useState<Product | null>(null)
-  const [showStockEntry, setShowStockEntry] = useState(false)
-  const [showStockAdjust, setShowStockAdjust] = useState(false)
-  const [showStockHistory, setShowStockHistory] = useState(false)
   const [tab, setTab] = useState('pdv')
 
   const [fType, setFType] = useState('all')
@@ -236,23 +222,6 @@ export default function Financeiro() {
     setTimeout(() => setExportingExcel(false), 600)
   }
 
-  const stockStatusMeta = (
-    p: Product,
-  ): { label: string; variant: 'danger' | 'warning' | 'success' } => {
-    const q = p.stock_quantity ?? 0
-    const min = p.min_stock ?? 5
-    if (q <= min) return { label: 'Estoque Baixo', variant: 'danger' }
-    if (q > min && q <= min * 2) return { label: 'Estoque Médio', variant: 'warning' }
-    return { label: 'OK', variant: 'success' }
-  }
-
-  const lowStockCount = products.filter((p) => (p.stock_quantity ?? 0) <= (p.min_stock ?? 5)).length
-  const mediumStockCount = products.filter((p) => {
-    const q = p.stock_quantity ?? 0
-    const min = p.min_stock ?? 5
-    return q > min && q <= min * 2
-  }).length
-
   return (
     <div className="space-y-6 animate-fade-in-up">
       <div className="page-header">
@@ -263,9 +232,7 @@ export default function Financeiro() {
       </div>
 
       <Tabs value={tab} onValueChange={setTab} className="w-full">
-        <TabsList
-          className={cn('grid w-full max-w-2xl', isStockManager ? 'grid-cols-3' : 'grid-cols-2')}
-        >
+        <TabsList className="grid w-full max-w-2xl grid-cols-2">
           <TabsTrigger
             value="pdv"
             className="data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
@@ -273,7 +240,6 @@ export default function Financeiro() {
             <ShoppingCart className="h-4 w-4 mr-2" /> PDV
           </TabsTrigger>
           <TabsTrigger value="fluxo">Fluxo de Caixa</TabsTrigger>
-          {isStockManager && <TabsTrigger value="estoque">Estoque</TabsTrigger>}
         </TabsList>
 
         {/* ===================== PDV ===================== */}
@@ -451,147 +417,6 @@ export default function Financeiro() {
             </Card>
           </div>
         </TabsContent>
-
-        {/* ===================== Estoque ===================== */}
-        {isStockManager && (
-          <TabsContent value="estoque" className="mt-6 space-y-4">
-            <div>
-              <h2 className="text-xl font-bold font-serif flex items-center gap-2">
-                <Package className="h-5 w-5 text-accent" /> Controle de Estoque
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Monitore quantidades, receba alertas e registre entradas e ajustes.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Card className="hover:shadow-md transition-shadow duration-200 ease-in-out">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground uppercase font-semibold">
-                      Produtos Cadastrados
-                    </p>
-                    <Package className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <p className="text-2xl font-bold mt-2">{products.length}</p>
-                </CardContent>
-              </Card>
-              <Card className="border-destructive/40 hover:shadow-md transition-shadow duration-200 ease-in-out">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground uppercase font-semibold">
-                      Estoque Baixo
-                    </p>
-                    <AlertTriangle className="h-4 w-4 text-destructive" />
-                  </div>
-                  <p className="text-2xl font-bold text-destructive mt-2">{lowStockCount}</p>
-                </CardContent>
-              </Card>
-              <Card className="border-warning/40 hover:shadow-md transition-shadow duration-200 ease-in-out">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground uppercase font-semibold">
-                      Estoque Médio
-                    </p>
-                    <AlertTriangle className="h-4 w-4 text-warning" />
-                  </div>
-                  <p className="text-2xl font-bold text-warning mt-2">{mediumStockCount}</p>
-                </CardContent>
-              </Card>
-            </div>
-            <Card className="hover:shadow-md transition-shadow duration-200 ease-in-out">
-              <CardHeader className="flex flex-row items-center justify-between border-b bg-muted/20 pb-4 space-y-0">
-                <CardTitle className="font-serif text-xl">Produtos & Estoque</CardTitle>
-                <Button variant="outline" size="sm" onClick={() => setShowAddProduct(true)}>
-                  <Plus className="h-4 w-4 mr-2" /> Novo Produto
-                </Button>
-              </CardHeader>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="pl-6">Produto</TableHead>
-                      <TableHead>Preço</TableHead>
-                      <TableHead>Estoque</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right pr-6">Ações</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {products.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                          Nenhum produto cadastrado.
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      products.map((p) => {
-                        const q = p.stock_quantity ?? 0
-                        const meta = stockStatusMeta(p)
-                        return (
-                          <TableRow key={p.id} className="hover:bg-muted/30">
-                            <TableCell className="pl-6 font-medium">
-                              {p.name}
-                              {p.description && (
-                                <span className="block text-xs text-muted-foreground">
-                                  {p.description}
-                                </span>
-                              )}
-                            </TableCell>
-                            <TableCell>{fmt(Number(p.price))}</TableCell>
-                            <TableCell className="font-semibold">{q}</TableCell>
-                            <TableCell>
-                              <Badge variant={meta.variant}>{meta.label}</Badge>
-                            </TableCell>
-                            <TableCell className="text-right pr-6">
-                              <div className="flex justify-end gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 hover:text-success"
-                                  title="Entrada de estoque"
-                                  onClick={() => {
-                                    setStockProduct(p)
-                                    setShowStockEntry(true)
-                                  }}
-                                >
-                                  <PackagePlus className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 hover:text-accent"
-                                  title="Ajustar estoque"
-                                  onClick={() => {
-                                    setStockProduct(p)
-                                    setShowStockAdjust(true)
-                                  }}
-                                >
-                                  <SlidersHorizontal className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  title="Histórico de movimentações"
-                                  onClick={() => {
-                                    setStockProduct(p)
-                                    setShowStockHistory(true)
-                                  }}
-                                >
-                                  <History className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
 
         {/* ===================== Fluxo de Caixa ===================== */}
         <TabsContent value="fluxo" className="mt-6">
@@ -804,23 +629,6 @@ export default function Financeiro() {
         open={showAddExpense}
         onOpenChange={setShowAddExpense}
         onCreated={loadAll}
-      />
-      <StockEntryDialog
-        product={stockProduct}
-        open={showStockEntry}
-        onOpenChange={setShowStockEntry}
-        onDone={loadProducts}
-      />
-      <StockAdjustDialog
-        product={stockProduct}
-        open={showStockAdjust}
-        onOpenChange={setShowStockAdjust}
-        onDone={loadProducts}
-      />
-      <StockHistoryDialog
-        product={stockProduct}
-        open={showStockHistory}
-        onOpenChange={setShowStockHistory}
       />
     </div>
   )

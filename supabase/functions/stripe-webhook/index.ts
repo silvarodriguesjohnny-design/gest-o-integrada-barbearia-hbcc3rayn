@@ -1,7 +1,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
-import { getStripeSecrets } from './stripe.ts'
+import { getStripeSecrets } from '../_shared/stripe.ts'
 
 async function verifyStripeSignature(payload: string, signature: string, secret: string) {
   // Minimal Stripe webhook signature verification using Web Crypto API.

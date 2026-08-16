@@ -20,3 +20,8 @@ export async function updateService(id: string, data: Partial<Service>) {
     .single()
   return { data: result as Service | null, error }
 }
+
+export async function deleteService(id: string) {
+  const { error } = await db.from('services').delete().eq('id', id)
+  return { error }
+}

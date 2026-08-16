@@ -1,7 +1,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { corsHeaders } from '../_shared/cors.ts'
-import { getStripeSecrets } from './stripe.ts'
+import { getStripeSecrets } from '../_shared/stripe.ts'
 
 interface CheckoutBody {
   plan_id: string

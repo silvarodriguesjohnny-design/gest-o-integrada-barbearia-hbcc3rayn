@@ -15,6 +15,8 @@ import Clientes from './pages/Clientes'
 import Barbeiros from './pages/Barbeiros'
 import Agenda from './pages/Agenda'
 import Financeiro from './pages/Financeiro'
+import Servicos from './pages/Servicos'
+import Estoque from './pages/Estoque'
 import Campanhas from './pages/Campanhas'
 import Settings from './pages/Settings'
 import EnvioManual from './pages/EnvioManual'
@@ -155,12 +157,12 @@ const App = () => (
             <Route path="/agenda" element={<Navigate to="/dashboard/agenda" replace />} />
             <Route path="/dashboard/financeiro" element={<Financeiro />} />
             <Route path="/financeiro" element={<Navigate to="/dashboard/financeiro" replace />} />
-            <Route path="/dashboard/estoque" element={<Financeiro />} />
+            <Route path="/dashboard/estoque" element={<Estoque />} />
             <Route path="/dashboard/campanhas" element={<Campanhas />} />
             <Route path="/campanhas" element={<Navigate to="/dashboard/campanhas" replace />} />
             <Route path="/dashboard/mensagens" element={<EnvioManual />} />
             <Route path="/mensagens" element={<Navigate to="/dashboard/mensagens" replace />} />
-            <Route path="/dashboard/servicos" element={<Financeiro />} />
+            <Route path="/dashboard/servicos" element={<Servicos />} />
             <Route path="/dashboard/assinaturas" element={<Assinaturas />} />
             <Route path="/dashboard/assinaturas/confirmacao" element={<AssinaturaSucesso />} />
             <Route path="/dashboard/configuracoes" element={<Settings />} />
