@@ -9,6 +9,7 @@ export interface PublicTenant {
   logo_url: string | null
   slug: string
   whatsapp_phone: string | null
+  stripe_enabled?: boolean
 }
 
 export interface PublicService {

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, Check, X, Clock, Eye } from 'lucide-react'
+import { Loader2, Check, X, Clock, Eye, PartyPopper } from 'lucide-react'
 import { getPendingTenants, approveTenant, rejectPendingTenant } from '@/services/pending-tenants'
 import { useToast } from '@/hooks/use-toast'
 import type { PendingTenant } from '@/types'
@@ -70,7 +70,23 @@ export function PendingTenants({ refreshTrigger }: { refreshTrigger?: number }) 
   }
 
   const pending = tenants.filter((t) => t.status === 'pending')
-  if (pending.length === 0) return null
+  if (pending.length === 0) {
+    return (
+      <Card className="p-6 mb-6 border-emerald-200 bg-emerald-50/40">
+        <div className="flex flex-col items-center text-center gap-3 py-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100">
+            <PartyPopper className="h-6 w-6 text-emerald-600" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-emerald-700">Nenhum cadastro pendente. 🎉</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Todos os cadastros de barbearias já foram revisados.
+            </p>
+          </div>
+        </div>
+      </Card>
+    )
+  }
 
   return (
     <Card className="p-4 mb-6 border-amber-200 bg-amber-50/50">

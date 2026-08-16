@@ -24,6 +24,7 @@ import {
   MonitorSmartphone,
   Wallet,
   Repeat,
+  CreditCard,
 } from 'lucide-react'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
@@ -42,9 +43,12 @@ const NAV_ITEMS = [
   { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
   { name: 'Cadastros Pendentes', path: '/admin/cadastros-pendentes', icon: UserCheck },
   { name: 'Barbearias', path: '/admin/barbearias', icon: Store },
+  { name: 'Agendamentos', path: '/admin/agendamentos', icon: CalendarDays },
+  { name: 'Clientes', path: '/admin/clientes', icon: Users },
   { name: 'Relatórios', path: '/admin/relatorios', icon: Download },
   { name: 'Meu Caixa', path: '/admin/meu-caixa', icon: Wallet },
   { name: 'Totem & PWA', path: '/admin/totem-pwa', icon: MonitorSmartphone },
+  { name: 'Stripe', path: '/admin/stripe', icon: CreditCard },
   { name: 'Configurações', path: '/admin/configuracoes', icon: Settings },
 ]
 

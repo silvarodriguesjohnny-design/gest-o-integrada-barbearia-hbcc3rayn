@@ -36,6 +36,7 @@ import AdminConfiguracoes from '@/pages/admin/AdminConfiguracoes'
 import AdminRelatorios from '@/pages/admin/AdminRelatorios'
 import AdminTotemPwa from '@/pages/admin/AdminTotemPwa'
 import AdminMeuCaixa from '@/pages/admin/AdminMeuCaixa'
+import AdminStripeConfig from '@/pages/admin/AdminStripeConfig'
 import Assinaturas from '@/pages/Assinaturas'
 
 function FullScreenLoader() {
@@ -187,6 +188,7 @@ const App = () => (
             <Route path="/admin/meu-caixa" element={<AdminMeuCaixa />} />
             <Route path="/admin/totem-pwa" element={<AdminTotemPwa />} />
             <Route path="/admin/configuracoes" element={<AdminConfiguracoes />} />
+            <Route path="/admin/stripe" element={<AdminStripeConfig />} />
             <Route path="/admin" element={<AdminIndexRedirect />} />
           </Route>
 

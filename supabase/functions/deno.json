@@ -1,19 +1,20 @@
 {
   "_versions": {
-    "send-notifications": 41,
+    "send-notifications": 43,
     "tenant-billing": 4,
-    "ai-whatsapp": 36,
+    "ai-whatsapp": 38,
     "invite-user": 3,
-    "send-email": 22,
-    "test-messaging": 37,
-    "send-appointment-notification": 38,
-    "public-booking": 39,
+    "send-email": 24,
+    "test-messaging": 39,
+    "send-appointment-notification": 40,
+    "public-booking": 41,
     "create-operator": 3,
-    "approve-tenant": 23,
-    "send-manual-message": 36,
+    "approve-tenant": 25,
+    "send-manual-message": 38,
     "totem-pwa": 1,
-    "stripe-webhook": 1,
-    "stripe-create-checkout": 1,
-    "stripe-cancel-subscription": 1
+    "stripe-webhook": 3,
+    "stripe-create-checkout": 3,
+    "stripe-cancel-subscription": 3,
+    "stripe-config": 1
   }
 }

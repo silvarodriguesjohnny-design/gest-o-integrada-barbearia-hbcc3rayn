@@ -7,6 +7,7 @@ import {
   buildWaMeLink,
 } from '../_shared/evolution-api.ts'
 import { formatBrasiliaDateTime } from '../_shared/datetime.ts'
+import { isStripeConfigured } from '../_shared/stripe.ts'
 
 export const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -43,7 +44,8 @@ Deno.serve(async (req: Request) => {
         .from('services')
         .select('*')
         .eq('tenant_id', effectiveId)
-      return new Response(JSON.stringify({ tenant, services: services || [] }), {
+      const stripe_enabled = await isStripeConfigured()
+      return new Response(JSON.stringify({ tenant, services: services || [], stripe_enabled }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }

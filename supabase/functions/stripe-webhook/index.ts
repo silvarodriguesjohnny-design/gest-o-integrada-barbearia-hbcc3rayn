@@ -1,12 +1,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2'
-
-export const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers':
-    'authorization, x-client-info, x-supabase-client-platform, apikey, content-type',
-}
+import { corsHeaders } from '../_shared/cors.ts'
+import { getStripeSecrets } from '../_shared/stripe.ts'
 
 async function verifyStripeSignature(payload: string, signature: string, secret: string) {
   // Minimal Stripe webhook signature verification using Web Crypto API.
@@ -51,8 +46,7 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY') ?? ''
-    const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET') ?? ''
+    const { secretKey: stripeSecretKey, webhookSecret } = await getStripeSecrets()
 
     if (!stripeSecretKey || !webhookSecret) {
       return new Response(JSON.stringify({ error: 'Stripe webhook não configurado.' }), {
@@ -76,6 +70,16 @@ Deno.serve(async (req: Request) => {
 
     const event = JSON.parse(payload)
     console.log('[stripe-webhook] Received event:', event.type)
+
+    // Registra o evento recebido para o painel admin exibir o status do webhook.
+    try {
+      await supabase.from('stripe_webhook_events').insert({
+        event_type: event.type,
+        event_id: event.id || null,
+      })
+    } catch (logErr) {
+      console.error('[stripe-webhook] Error logging event:', String(logErr))
+    }
 
     const stripeApiBase = 'https://api.stripe.com/v1'
 

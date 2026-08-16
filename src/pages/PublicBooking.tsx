@@ -47,7 +47,6 @@ import { cn } from '@/lib/utils'
 import { manifestUrl } from '@/services/totem-pwa'
 import type { SubscriptionPlan } from '@/types'
 import { hasActiveSubscription } from '@/services/subscriptions'
-import { calcPrepaidPrice } from '@/services/subscriptions'
 
 const fmtPrice = (v: number) =>
   Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -98,6 +97,10 @@ export default function PublicBooking() {
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null)
   const [paymentType, setPaymentType] = useState<'monthly' | 'prepaid'>('monthly')
   const [checkoutLoading, setCheckoutLoading] = useState(false)
+  // --- Pagamento antecipado (antes da confirmação) ---
+  const [prepayChoice, setPrepayChoice] = useState<'now' | 'later' | null>(null)
+  const [stripeEnabled, setStripeEnabled] = useState(false)
+  const [prepaidPlan, setPrepaidPlan] = useState<SubscriptionPlan | null>(null)
 
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [rawMonthData, setRawMonthData] = useState<Map<string, MonthSlotData>>(new Map())
@@ -124,6 +127,7 @@ export default function PublicBooking() {
         } else {
           setTenant(data.tenant)
           setServices(data.services)
+          setStripeEnabled(!!data.tenant.stripe_enabled)
           setResolvedTenantId(data.tenant.id)
           setLoading(false)
         }
@@ -144,6 +148,7 @@ export default function PublicBooking() {
         } else {
           setTenant(data.tenant)
           setServices(data.services)
+          setStripeEnabled(!!data.tenant.stripe_enabled)
         }
         setLoading(false)
       })
@@ -230,9 +235,52 @@ export default function PublicBooking() {
     }
   }, [selectedSlot])
 
-  const handleBook = async () => {
+  // Carrega planos de assinatura quando o Stripe está configurado, para oferecer
+  // pagamento antecipado com desconto antes da confirmação do agendamento.
+  useEffect(() => {
+    if (!resolvedTenantId || !stripeEnabled) return
+    getPublicSubscriptionPlans(resolvedTenantId).then(({ data }) => {
+      if (data && data.length > 0) {
+        setPlans(data)
+        // Pré-seleciona o primeiro plano com pacote pré-pago disponível
+        const prepaid = data.find((p) => p.prepaid_months > 0 && p.prepaid_price > 0) || null
+        setPrepaidPlan(prepaid)
+      }
+    })
+  }, [resolvedTenantId, stripeEnabled])
+
+  const handleBook = async (opts?: { prepay?: boolean }) => {
     if (!resolvedTenantId || !selectedService || !selectedSlot || !customer) return
     setBooking(true)
+
+    // Se o cliente escolheu pagar agora, iniciamos o checkout do plano pré-pago
+    // ANTES de criar o agendamento. Ao retornar do Stripe, o agendamento será
+    // criado pelo fluxo normal (ou pelo webhook, conforme implementação futura).
+    if (opts?.prepay && prepaidPlan) {
+      const successUrl = `${window.location.origin}/agendar/${tenant?.slug || resolvedTenantId}?paid=1`
+      const cancelUrl = `${window.location.origin}/agendar/${tenant?.slug || resolvedTenantId}`
+      const { data: checkoutData, error: checkoutError } = await startPublicSubscriptionCheckout({
+        plan_id: prepaidPlan.id,
+        client_id: customer.id,
+        payment_type: 'prepaid',
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+      })
+      setBooking(false)
+      if (checkoutError || !checkoutData?.checkout_url) {
+        toast({
+          title: 'Erro no pagamento',
+          description: checkoutError?.message || 'Não foi possível iniciar o pagamento antecipado.',
+          variant: 'destructive',
+        })
+        return
+      }
+      // Redireciona para o Stripe Checkout — o agendamento será confirmado após retorno.
+      window.location.href = checkoutData.checkout_url
+      return
+    }
+
+    // Fluxo normal: cria o agendamento sem pagamento antecipado.
     const { error } = await createBooking({
       tenant_id: resolvedTenantId,
       service_id: selectedService.id,
@@ -854,15 +902,118 @@ export default function PublicBooking() {
                       </span>
                     </div>
                   </div>
-                  <Button
-                    variant="amber"
-                    size="lg"
-                    loading={booking}
-                    className="w-full min-h-[56px] text-base md:text-lg touch-manipulation shadow-lg"
-                    onClick={handleBook}
-                  >
-                    {booking ? 'Confirmando…' : `Confirmar Agendamento para ${selectedSlot}`}
-                  </Button>
+
+                  {/* Opção de pagamento antecipado com desconto (apenas se Stripe configurado
+                      e houver plano pré-pago disponível) */}
+                  {stripeEnabled && prepaidPlan ? (
+                    <div className="space-y-3 border-t pt-4">
+                      <div className="flex items-center gap-2 text-sm md:text-base">
+                        <CreditCard className="h-4 w-4 md:h-5 text-accent" />
+                        <span className="font-semibold">Pagamento antecipado</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Assine o plano <strong>{prepaidPlan.name}</strong> com{' '}
+                        {prepaidPlan.prepaid_months} meses à vista e ganhe{' '}
+                        {prepaidPlan.prepaid_discount_pct}% de desconto.
+                      </p>
+                      {prepayChoice === null ? (
+                        <div className="grid gap-2">
+                          <Button
+                            variant="amber"
+                            className="w-full min-h-[56px] flex flex-col touch-manipulation"
+                            disabled={booking}
+                            onClick={() => setPrepayChoice('now')}
+                          >
+                            <span className="text-sm font-semibold">Pagar agora com desconto</span>
+                            <span className="text-xs opacity-80">
+                              {fmtPrice(prepaidPlan.prepaid_price)} · {prepaidPlan.prepaid_months}{' '}
+                              meses
+                            </span>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="w-full min-h-[48px] touch-manipulation"
+                            disabled={booking}
+                            onClick={() => setPrepayChoice('later')}
+                          >
+                            Agendar sem pagar
+                          </Button>
+                        </div>
+                      ) : prepayChoice === 'now' ? (
+                        <div className="space-y-2 rounded-lg border border-accent/40 bg-accent/5 p-3">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Plano</span>
+                            <span className="font-medium">{prepaidPlan.name}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">De</span>
+                            <span className="line-through text-muted-foreground">
+                              {fmtPrice(prepaidPlan.price * prepaidPlan.prepaid_months)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between font-semibold">
+                            <span>Por</span>
+                            <span className="text-accent">
+                              {fmtPrice(prepaidPlan.prepaid_price)}
+                            </span>
+                          </div>
+                          <Button
+                            variant="amber"
+                            size="lg"
+                            loading={booking}
+                            className="w-full min-h-[56px] touch-manipulation shadow-lg"
+                            onClick={() => handleBook({ prepay: true })}
+                          >
+                            {booking
+                              ? 'Iniciando pagamento…'
+                              : `Pagar ${fmtPrice(prepaidPlan.prepaid_price)} e Agendar`}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full"
+                            disabled={booking}
+                            onClick={() => setPrepayChoice(null)}
+                          >
+                            Voltar
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <Button
+                            variant="amber"
+                            size="lg"
+                            loading={booking}
+                            className="w-full min-h-[56px] text-base md:text-lg touch-manipulation shadow-lg"
+                            onClick={() => handleBook()}
+                          >
+                            {booking
+                              ? 'Confirmando…'
+                              : `Confirmar Agendamento para ${selectedSlot}`}
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full"
+                            disabled={booking}
+                            onClick={() => setPrepayChoice(null)}
+                          >
+                            Ver opção com desconto
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <Button
+                      variant="amber"
+                      size="lg"
+                      loading={booking}
+                      className="w-full min-h-[56px] text-base md:text-lg touch-manipulation shadow-lg"
+                      onClick={() => handleBook()}
+                    >
+                      {booking ? 'Confirmando…' : `Confirmar Agendamento para ${selectedSlot}`}
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             )}
