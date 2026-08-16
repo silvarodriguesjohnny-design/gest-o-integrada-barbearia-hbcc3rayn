@@ -12,7 +12,7 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 export default function Landing() {
   const { user, loading } = useAuth()
 
-  if (!loading && user) return <Navigate to="/dashboard" replace />
+  if (!loading && user) return <Navigate to="/selecionar-perfil" replace />
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-200 ease-in-out">
