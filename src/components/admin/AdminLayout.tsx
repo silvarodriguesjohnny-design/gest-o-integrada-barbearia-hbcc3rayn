@@ -39,7 +39,6 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
-import { Toaster as Sonner } from '@/components/ui/sonner'
 
 const NAV_ITEMS = [
   { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
@@ -170,9 +169,6 @@ export default function AdminLayout() {
           </div>
         </main>
       </div>
-      {/* Toaster do sonner, montado apenas nos layouts internos (a Landing
-         pública não precisa dele e o sonner v2 quebra com radix Slot). */}
-      <Sonner />
     </SidebarProvider>
   )
 }

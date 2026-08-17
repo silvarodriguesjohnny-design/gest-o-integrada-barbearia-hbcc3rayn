@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/select'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
-import { toast } from 'sonner'
+import { toast } from '@/hooks/use-toast'
 import {
   Send,
   Loader2,
@@ -97,15 +97,27 @@ export default function EnvioManual() {
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!tenantId) {
-      toast.error('Sessão expirada ou barbearia não identificada.')
+      toast({
+        title: 'Sessão expirada',
+        description: 'Sessão expirada ou barbearia não identificada.',
+        variant: 'destructive',
+      })
       return
     }
     if (!phone || phone.replace(/\D/g, '').length < 10) {
-      toast.error('Informe um número de telefone válido com DDD (mínimo 10 dígitos).')
+      toast({
+        title: 'Telefone inválido',
+        description: 'Informe um número de telefone válido com DDD (mínimo 10 dígitos).',
+        variant: 'destructive',
+      })
       return
     }
     if (!message.trim()) {
-      toast.error('Digite a mensagem a ser enviada.')
+      toast({
+        title: 'Mensagem vazia',
+        description: 'Digite a mensagem a ser enviada.',
+        variant: 'destructive',
+      })
       return
     }
 
@@ -126,19 +138,28 @@ export default function EnvioManual() {
         const errorMsg =
           data?.error || error?.message || 'Falha ao enviar mensagem. Verifique a integração.'
         setErrorAlert(errorMsg)
-        toast.error('Falha no envio da mensagem', {
+        toast({
+          title: 'Falha no envio da mensagem',
           description: errorMsg,
+          variant: 'destructive',
         })
       } else {
         const successText = `Mensagem enviada com sucesso para ${customerName || phone}!`
         setLastSuccessMsg(successText)
-        toast.success(successText)
+        toast({
+          title: 'Mensagem enviada',
+          description: successText,
+        })
         setMessage('')
       }
     } catch (err) {
       const msg = `Erro inesperado: ${String(err)}`
       setErrorAlert(msg)
-      toast.error(msg)
+      toast({
+        title: 'Erro inesperado',
+        description: msg,
+        variant: 'destructive',
+      })
     } finally {
       setLoading(false)
     }
