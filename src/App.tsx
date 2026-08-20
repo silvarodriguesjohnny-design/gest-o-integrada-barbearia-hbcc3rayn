@@ -1,6 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ReactNode } from 'react'
-import { Toaster } from '@/components/ui/toaster'
 import { Loader2 } from 'lucide-react'
 import { AuthProvider, useAuth } from '@/hooks/use-auth'
 import Landing from './pages/Landing'
@@ -111,7 +110,6 @@ function AdminIndexRedirect() {
 const App = () => (
   <BrowserRouter>
     <AuthProvider>
-      <Toaster />
       <Routes>
         {/* Públicas */}
         <Route path="/" element={<Landing />} />

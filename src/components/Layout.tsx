@@ -45,6 +45,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { NotificationBell } from '@/components/NotificationBell'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { Toaster } from '@/components/ui/toaster'
 
 const NAV_ITEMS = [
   { name: 'Dashboard', path: '/dashboard', icon: Home },
@@ -216,6 +217,7 @@ export default function Layout() {
             </div>
           </main>
         </div>
+        <Toaster />
       </SidebarProvider>
     </TooltipProvider>
   )

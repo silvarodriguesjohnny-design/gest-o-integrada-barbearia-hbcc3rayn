@@ -40,6 +40,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { Toaster } from '@/components/ui/toaster'
 
 const NAV_ITEMS = [
   { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
@@ -173,6 +174,7 @@ export default function AdminLayout() {
             </div>
           </main>
         </div>
+        <Toaster />
       </SidebarProvider>
     </TooltipProvider>
   )
