@@ -58,6 +58,12 @@ export async function updateTenant(
   return { error }
 }
 
+export async function getTenantSlug(tenantId: string): Promise<string | null> {
+  const { data, error } = await db.from('tenants').select('slug').eq('id', tenantId).maybeSingle()
+  if (error || !data) return null
+  return (data as { slug: string | null }).slug
+}
+
 export async function uploadLogo(
   tenantId: string,
   file: File,

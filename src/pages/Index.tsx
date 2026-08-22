@@ -19,6 +19,7 @@ import {
 import { getDashboardMetrics } from '@/services/dashboard'
 import { useToast } from '@/hooks/use-toast'
 import { useAuth } from '@/hooks/use-auth'
+import { OnboardingJourney } from '@/components/OnboardingJourney'
 import type { DashboardMetrics } from '@/types'
 
 export default function Index() {
@@ -70,6 +71,8 @@ export default function Index() {
           Visão geral do desempenho da sua barbearia hoje.
         </p>
       </div>
+
+      {tenant && <OnboardingJourney tenantId={tenant.id} />}
 
       {bookingLink && (
         <Card className="hover:shadow-elevation transition-shadow">
