@@ -445,6 +445,15 @@ export default function AdminTotemPwa() {
         <Button variant="outline" onClick={handleShowQr} disabled={!slug}>
           <QrCode className="h-4 w-4 mr-1" /> Ver QR Code
         </Button>
+        <Button
+          variant="outline"
+          onClick={handleDownloadZip}
+          loading={downloading}
+          disabled={!tenantId || !appName}
+        >
+          {!downloading && <FileArchive className="h-4 w-4 mr-1" />}
+          Baixar App (.zip)
+        </Button>
       </div>
 
       {/* Link copiável */}

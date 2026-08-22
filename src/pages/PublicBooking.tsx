@@ -21,6 +21,9 @@ import {
   MonitorSmartphone,
   BadgeCheck,
   CreditCard,
+  LifeBuoy,
+  X,
+  Send,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { ptBR } from 'date-fns/locale'
@@ -1056,6 +1059,99 @@ export default function PublicBooking() {
           </div>
         </div>
       )}
+
+      {/* Botão de suporte para o cliente */}
+      <SupportFAB />
     </div>
+  )
+}
+
+const SUPPORT_EMAIL = 'silvarodriguesjohnny@gmail.com'
+const SUPPORT_SUBJECT = 'Suporte Na Régua - Cliente'
+
+function SupportFAB() {
+  const [open, setOpen] = useState(false)
+  const [message, setMessage] = useState('')
+
+  const handleSend = () => {
+    const body = message.trim() || 'Preciso de suporte na plataforma Na Régua.'
+    const href = `mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(SUPPORT_SUBJECT)}&body=${encodeURIComponent(body)}`
+    window.location.href = href
+    setOpen(false)
+    setMessage('')
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="fixed bottom-6 right-6 z-50 flex h-14 items-center gap-2 rounded-full bg-amber-500 px-5 text-white shadow-lg shadow-amber-500/30 transition-all hover:bg-amber-600 active:scale-95"
+        aria-label="Suporte"
+      >
+        <LifeBuoy className="h-6 w-6" />
+        <span className="text-sm font-semibold">Suporte</span>
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-slate-700 dark:bg-slate-800"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-start justify-between">
+              <div className="flex items-center gap-2">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300">
+                  <LifeBuoy className="h-5 w-5" />
+                </div>
+                <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+                  Precisa de ajuda?
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-700"
+                aria-label="Fechar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <label className="mb-1 block text-xs font-medium text-slate-500 dark:text-slate-400">
+              Descreva o problema
+            </label>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              rows={5}
+              placeholder="Ex: Não consigo selecionar um horário..."
+              className="w-full resize-none rounded-md border border-slate-300 bg-white p-3 text-sm text-slate-800 outline-none focus:border-amber-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+            />
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSend}
+                className="inline-flex items-center gap-2 rounded-md bg-amber-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-amber-600"
+              >
+                <Send className="h-4 w-4" />
+                Enviar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   )
 }

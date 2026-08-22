@@ -358,11 +358,11 @@ Deno.serve(async (req: Request) => {
       await sendApptNotif(appt, msg, 'whatsapp_reminder_today', 'appointment_reminder_today')
     }
 
-    // 3. No-show detection
-    // DISABLED (v0.0.86): the no-show block was auto-cancelling past-due
-    // appointments and sending WhatsApp absence messages. Commented out per
-    // request. Step kept here as a no-op placeholder so the numbering stays
-    // stable for the steps that follow.
+    // STEP 3 desativado por solicitação do cliente
+    /* 3. No-show detection — disabled per client request.
+       Previously: queried appointments with end_time in the past and status
+       scheduled/confirmed, marked them as cancelled, and sent a WhatsApp
+       absence message.
     console.log('[send-notifications] === STEP 3: No-show detection (DISABLED) ===')
     // const { data: noShowAppts, error: noShowError } = await supabase
     //   .from('appointments')
@@ -400,6 +400,7 @@ Deno.serve(async (req: Request) => {
     //     )
     //   }
     // }
+    */
 
     // 4. Birthday notifications
     console.log('[send-notifications] === STEP 4: Birthday notifications ===')

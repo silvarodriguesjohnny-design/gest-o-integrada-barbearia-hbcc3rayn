@@ -27,7 +27,7 @@ import {
   CreditCard,
   LifeBuoy,
 } from 'lucide-react'
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
@@ -94,17 +94,15 @@ export default function AdminLayout() {
                       return (
                         <SidebarMenuItem key={item.path}>
                           <SidebarMenuButton
-                            asChild
                             isActive={isActive}
                             className={cn(
                               'text-sm font-medium transition-colors duration-200 ease-in-out',
                               isActive && 'bg-accent/10 text-accent font-semibold',
                             )}
+                            onClick={() => navigate(item.path)}
                           >
-                            <Link to={item.path}>
-                              <item.icon className="h-5 w-5" />
-                              <span>{item.name}</span>
-                            </Link>
+                            <item.icon className="h-5 w-5" />
+                            <span>{item.name}</span>
                           </SidebarMenuButton>
                         </SidebarMenuItem>
                       )

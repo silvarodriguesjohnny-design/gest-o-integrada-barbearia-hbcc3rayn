@@ -129,11 +129,7 @@ export async function downloadPwaZip(input: PwaZipInput): Promise<void> {
  * Se a URL não existir ou o fetch falhar, gera um placeholder quadrado
  * com a cor de fundo e a inicial do app.
  */
-async function resolveIcon(
-  url: string | null,
-  size: number,
-  bgColor: string,
-): Promise<Uint8Array> {
+async function resolveIcon(url: string | null, size: number, bgColor: string): Promise<Uint8Array> {
   if (url) {
     try {
       const resp = await fetch(url)

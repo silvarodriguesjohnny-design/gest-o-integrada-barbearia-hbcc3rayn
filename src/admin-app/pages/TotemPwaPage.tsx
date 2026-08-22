@@ -402,7 +402,12 @@ export function TotemPwaPage() {
         <Button variant="outline" onClick={handleShowQr} disabled={!slug}>
           <QrCode className="h-4 w-4" /> Ver QR Code
         </Button>
-        <Button variant="outline" onClick={handleDownloadZip} loading={downloading} disabled={!tenantId || !appName || !slug}>
+        <Button
+          variant="outline"
+          onClick={handleDownloadZip}
+          loading={downloading}
+          disabled={!tenantId || !appName || !slug}
+        >
           <FileArchive className="h-4 w-4" /> Baixar App (.zip)
         </Button>
       </div>
