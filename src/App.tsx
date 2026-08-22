@@ -16,6 +16,7 @@ import Servicos from './pages/Servicos'
 import Estoque from './pages/Estoque'
 import Campanhas from './pages/Campanhas'
 import Settings from './pages/Settings'
+import Pagamentos from './pages/Pagamentos'
 import EnvioManual from './pages/EnvioManual'
 import UserManagement from './pages/UserManagement'
 import SetPassword from './pages/SetPassword'
@@ -160,6 +161,7 @@ const App = () => (
           <Route path="/dashboard/assinaturas" element={<Assinaturas />} />
           <Route path="/dashboard/assinaturas/confirmacao" element={<AssinaturaSucesso />} />
           <Route path="/dashboard/configuracoes" element={<Settings />} />
+          <Route path="/dashboard/pagamentos" element={<Pagamentos />} />
           <Route path="/settings" element={<Navigate to="/dashboard/configuracoes" replace />} />
         </Route>
 

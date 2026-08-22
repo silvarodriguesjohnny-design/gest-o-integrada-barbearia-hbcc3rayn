@@ -136,7 +136,7 @@ function buildSteps(state: {
       benefit:
         'Reduz falta e antecipa caixa. O cliente paga no agendamento e já chega com o horário garantido',
       completed: !!state.stripeConfigured,
-      action: { label: 'Configurar', type: 'navigate', target: '/dashboard/configuracoes' },
+      action: { label: 'Configurar', type: 'navigate', target: '/dashboard/pagamentos' },
     },
   ]
 }

@@ -14,6 +14,7 @@ import {
 import {
   Bell,
   Calendar,
+  CreditCard,
   DollarSign,
   Gift,
   Home,
@@ -56,6 +57,7 @@ const NAV_ITEMS = [
   { name: 'Financeiro', path: '/dashboard/financeiro', icon: DollarSign },
   { name: 'Estoque', path: '/dashboard/estoque', icon: Package },
   { name: 'Assinaturas', path: '/dashboard/assinaturas', icon: RefreshCw },
+  { name: 'Pagamentos', path: '/dashboard/pagamentos', icon: CreditCard },
   { name: 'Barbeiros', path: '/dashboard/barbeiros', icon: Scissors },
   { name: 'Campanhas', path: '/dashboard/campanhas', icon: Gift },
   { name: 'Mensagens', path: '/dashboard/mensagens', icon: MessageSquare },
