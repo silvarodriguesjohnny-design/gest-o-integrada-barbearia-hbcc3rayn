@@ -1,550 +1,563 @@
-import { useEffect, useState, useCallback } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { useEffect, useState } from 'react'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  ChartLegend,
-  ChartLegendContent,
-} from '@/components/ui/chart'
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, ResponsiveContainer } from 'recharts'
-import {
-  CalendarDays,
+  TrendingUp,
+  Users,
+  Scissors,
+  Calendar,
   CheckCircle2,
   XCircle,
-  TrendingUp,
-  Gift,
-  Loader2,
   Clock,
-  Eye,
-  Check,
-  Ban,
-  ArrowRight,
-  UserCheck,
-  RefreshCw,
+  Award,
+  Trophy,
+  AlertTriangle,
+  DollarSign,
+  Activity,
+  Crown,
+  Loader2,
 } from 'lucide-react'
-import { getAdminDashboardData } from '@/services/admin-dashboard'
-import { updateAppointmentStatus, cancelAppointment } from '@/services/appointments'
-import { useToast } from '@/hooks/use-toast'
+import {
+  getAdminDashboardData,
+  formatCurrencyBRL,
+  PLAN_LABELS,
+  type AdminDashboardData,
+} from '@/services/admin-dashboard'
+import type { AppointmentWithRelations } from '@/types'
 import { formatTimeHHMM, formatDateBR } from '@/lib/date-utils'
-import type { AdminDashboardData } from '@/services/admin-dashboard'
-import type { AppointmentWithRelations, AppointmentStatus } from '@/types'
 
-const STATUS_META: Record<
-  AppointmentStatus,
-  { label: string; variant: 'info' | 'success' | 'amber' | 'danger' }
-> = {
-  scheduled: { label: 'Agendado', variant: 'info' },
-  confirmed: { label: 'Confirmado', variant: 'success' },
-  completed: { label: 'Concluído', variant: 'amber' },
-  cancelled: { label: 'Cancelado', variant: 'danger' },
+type Data = AdminDashboardData
+
+const STATUS_LABELS: Record<string, string> = {
+  scheduled: 'Agendado',
+  confirmed: 'Confirmado',
+  completed: 'Concluído',
+  cancelled: 'Cancelado',
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  scheduled: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+  confirmed: 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300',
+  completed: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+  cancelled: 'bg-rose-100 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
+}
+
+function MetricCard({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+  value: string | number
+  sub?: string
+  accent: string
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</p>
+          <p className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{value}</p>
+          {sub && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{sub}</p>}
+        </div>
+        <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${accent}`}>
+          <Icon className="h-5 w-5" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Bar chart em Tailwind puro (SVG inline)
+function BarChart({ data }: { data: Data['chart7Days'] }) {
+  const max = Math.max(1, ...data.flatMap((d) => [d.confirmed, d.completed]))
+  return (
+    <div className="flex h-56 items-end justify-between gap-2">
+      {data.map((d) => {
+        const total = d.confirmed + d.completed + d.cancelled
+        const confH = (d.confirmed / max) * 100
+        const compH = (d.completed / max) * 100
+        const cancH = (d.cancelled / max) * 100
+        return (
+          <div key={d.date} className="flex flex-1 flex-col items-center gap-1">
+            <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+              {total > 0 ? total : ''}
+            </div>
+            <div className="flex h-40 w-full max-w-[36px] flex-col-reverse overflow-hidden rounded-t-md bg-slate-100 dark:bg-slate-700/40">
+              <div
+                style={{ height: `${confH}%` }}
+                className="w-full bg-blue-500"
+                title={`Confirmados: ${d.confirmed}`}
+              />
+              <div
+                style={{ height: `${compH}%` }}
+                className="w-full bg-emerald-500"
+                title={`Concluídos: ${d.completed}`}
+              />
+              <div
+                style={{ height: `${cancH}%` }}
+                className="w-full bg-rose-400"
+                title={`Cancelados: ${d.cancelled}`}
+              />
+            </div>
+            <span className="text-[11px] font-medium text-slate-600 dark:text-slate-300">
+              {d.label}
+            </span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// Gráfico de segmentação de planos (barras horizontais)
+function SegmentationBars({ data }: { data: Data['planSegmentation'] }) {
+  const colors: Record<string, string> = {
+    essential: 'bg-sky-500',
+    pro: 'bg-violet-500',
+    elite: 'bg-amber-500',
+  }
+  const total = data.reduce((s, d) => s + d.count, 0) || 1
+  return (
+    <div className="space-y-3">
+      {data.map((d) => (
+        <div key={d.plan}>
+          <div className="mb-1 flex items-center justify-between text-sm">
+            <span className="font-medium text-slate-700 dark:text-slate-200">{d.label}</span>
+            <span className="text-slate-500 dark:text-slate-400">
+              {d.count} ({d.pct}%)
+            </span>
+          </div>
+          <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700/50">
+            <div className={colors[d.plan]} style={{ width: `${(d.count / total) * 100}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function RankingList({
+  items,
+  valueLabel,
+  formatValue,
+}: {
+  items: { name: string; count?: number; total?: number }[]
+  valueLabel: string
+  formatValue: (v: number) => string
+}) {
+  if (items.length === 0) {
+    return <div className="py-8 text-center text-sm text-slate-400">Sem dados suficientes</div>
+  }
+  const max = Math.max(...items.map((i) => i.count ?? i.total ?? 0), 1)
+  return (
+    <div className="space-y-2">
+      {items.map((item, idx) => {
+        const val = item.count ?? item.total ?? 0
+        const pct = (val / max) * 100
+        return (
+          <div key={idx} className="flex items-center gap-3">
+            <span
+              className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                idx === 0
+                  ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                  : idx === 1
+                    ? 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                    : idx === 2
+                      ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300'
+                      : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'
+              }`}
+            >
+              {idx + 1}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate text-sm font-medium text-slate-700 dark:text-slate-200">
+                  {item.name}
+                </span>
+                <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                  {formatValue(val)}
+                </span>
+              </div>
+              <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700/50">
+                <div className="h-full rounded-full bg-indigo-500" style={{ width: `${pct}%` }} />
+              </div>
+            </div>
+          </div>
+        )
+      })}
+      <p className="pt-1 text-center text-[10px] uppercase tracking-wide text-slate-400">
+        {valueLabel}
+      </p>
+    </div>
+  )
+}
+
+function UpcomingRow({ a }: { a: AppointmentWithRelations }) {
+  return (
+    <div className="flex items-center justify-between border-b border-slate-100 px-2 py-2 last:border-0 dark:border-slate-700/50">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-slate-800 dark:text-slate-100">
+          {a.customer?.name || 'Cliente'}
+        </p>
+        <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+          {a.service?.name || 'Serviço'} · {a.barber_name || 'Profissional'}
+        </p>
+      </div>
+      <div className="flex flex-col items-end gap-1">
+        <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+          {formatTimeHHMM(a.start_time)}
+        </span>
+        <span
+          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${STATUS_COLORS[a.status] || ''}`}
+        >
+          {STATUS_LABELS[a.status] || a.status}
+        </span>
+      </div>
+    </div>
+  )
 }
 
 export default function AdminDashboard() {
-  const [data, setData] = useState<AdminDashboardData | null>(null)
+  const [data, setData] = useState<Data | null>(null)
   const [loading, setLoading] = useState(true)
-  const [actionLoading, setActionLoading] = useState<string | null>(null)
-  const { toast } = useToast()
-  const navigate = useNavigate()
-
-  const load = useCallback(() => {
-    setLoading(true)
-    getAdminDashboardData().then(({ data, error }) => {
-      if (error) {
-        toast({
-          title: 'Erro ao carregar dados',
-          description: error.message,
-          variant: 'destructive',
-        })
-      } else {
-        setData(data)
-      }
-      setLoading(false)
-    })
-  }, [toast])
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    load()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const handleQuickAction = async (
-    appt: AppointmentWithRelations,
-    action: 'confirm' | 'complete' | 'cancel',
-  ) => {
-    setActionLoading(appt.id + action)
-    let res: { error: any }
-    if (action === 'cancel') {
-      res = await cancelAppointment(appt.id, true)
-    } else {
-      const status = action === 'confirm' ? 'confirmed' : 'completed'
-      res = await updateAppointmentStatus(appt.id, status)
-    }
-    setActionLoading(null)
-    if (res.error) {
-      toast({ title: 'Erro', description: res.error.message, variant: 'destructive' })
-    } else {
-      toast({
-        title:
-          action === 'confirm'
-            ? 'Agendamento confirmado'
-            : action === 'complete'
-              ? 'Agendamento concluído'
-              : 'Agendamento cancelado',
+    let active = true
+    setLoading(true)
+    getAdminDashboardData()
+      .then(({ data: d, error: e }) => {
+        if (!active) return
+        if (e || !d) {
+          setError(e?.message || 'Não foi possível carregar os dados')
+        } else {
+          setData(d)
+        }
       })
-      load()
+      .catch(() => {
+        if (active) setError('Erro inesperado ao carregar dashboard')
+      })
+      .finally(() => active && setLoading(false))
+    return () => {
+      active = false
     }
-  }
+  }, [])
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-accent" />
-      </div>
-    )
-  }
-
-  // Se o carregamento falhou (data veio nulo), mostra um estado de erro
-  // em vez de quebrar a renderização acessando propriedades de null.
-  if (!data) {
-    return (
-      <div className="space-y-6 animate-fade-in-up">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            Visão geral da plataforma —{' '}
-            {new Date().toLocaleDateString('pt-BR', {
-              weekday: 'long',
-              day: '2-digit',
-              month: 'long',
-            })}
-          </p>
+      <div className="flex h-full min-h-[60vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-slate-500">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span className="text-sm">Carregando dashboard...</span>
         </div>
-        <Card>
-          <CardContent className="pt-6 text-center space-y-3">
-            <XCircle className="h-10 w-10 text-destructive mx-auto" />
-            <h2 className="text-xl font-semibold">Não foi possível carregar o dashboard</h2>
-            <p className="text-muted-foreground text-sm">
-              Ocorreu um erro ao buscar os dados. Tente novamente.
-            </p>
-            <Button variant="amber" onClick={load}>
-              <RefreshCw className="h-4 w-4 mr-2" /> Tentar novamente
-            </Button>
-          </CardContent>
-        </Card>
       </div>
     )
   }
 
-  const d = data
-  const maxChartValue = Math.max(
-    1,
-    ...d.chart7Days.map((c) => c.confirmed + c.completed + c.cancelled + c.scheduled),
-  )
-
-  const chartConfig = {
-    confirmed: { label: 'Confirmados', color: 'hsl(142 71% 45%)' },
-    completed: { label: 'Concluídos', color: 'hsl(var(--chart-1))' },
-    cancelled: { label: 'Cancelados', color: 'hsl(0 62.8% 50.6%)' },
-    scheduled: { label: 'Agendados', color: 'hsl(215 20.2% 65.1%)' },
+  if (error || !data) {
+    return (
+      <div className="flex h-full min-h-[60vh] items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-rose-600">
+          <AlertTriangle className="h-8 w-8" />
+          <span className="text-sm">{error || 'Erro desconhecido'}</span>
+        </div>
+      </div>
+    )
   }
-
-  const pieConfig: Record<string, { label: string; color: string }> = {}
-  d.topServices.forEach((s) => {
-    pieConfig[s.name] = { label: s.name, color: s.fill }
-  })
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            Visão geral da plataforma —{' '}
-            {new Date().toLocaleDateString('pt-BR', {
-              weekday: 'long',
-              day: '2-digit',
-              month: 'long',
-            })}
-          </p>
+    <div className="space-y-6 p-4 md:p-6">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Dashboard Admin</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          Visão geral da plataforma · {formatDateBR(new Date())}
+        </p>
+      </div>
+
+      {/* Vendas / Growth */}
+      <div>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          Vendas & Crescimento
+        </h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <MetricCard
+            icon={Users}
+            label="Total de Barbearias"
+            value={data.totalTenants}
+            sub={`${data.newTenants30d} novas nos últimos 30 dias`}
+            accent="bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300"
+          />
+          <MetricCard
+            icon={TrendingUp}
+            label="Novas (7 dias)"
+            value={data.newTenants7d}
+            sub="Barbearias que entraram na semana"
+            accent="bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300"
+          />
+          <MetricCard
+            icon={DollarSign}
+            label="MRR Estimado"
+            value={formatCurrencyBRL(data.mrr)}
+            sub="Receita recorrente mensal"
+            accent="bg-violet-100 text-violet-600 dark:bg-violet-950/40 dark:text-violet-300"
+          />
+          <MetricCard
+            icon={AlertTriangle}
+            label="Churn (15 dias)"
+            value={data.churnCount}
+            sub={`${data.activeTenantsWithAppt} ativas com agendamento`}
+            accent="bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300"
+          />
         </div>
-        <Button variant="outline" onClick={() => navigate('/admin/cadastros')}>
-          <UserCheck className="h-4 w-4 mr-2" /> Ver cadastros pendentes
-        </Button>
       </div>
 
-      {/* Métricas do dia */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <Card className="hover:shadow-elevation transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Agendamentos Hoje</CardTitle>
-            <CalendarDays className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{d.todayTotal}</div>
-            <p className="text-xs text-muted-foreground mt-1">Todos os status</p>
-          </CardContent>
-        </Card>
+      {/* Segmentação + MRR por plano */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 lg:col-span-2">
+          <div className="mb-4 flex items-center gap-2">
+            <Crown className="h-5 w-5 text-amber-500" />
+            <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+              Segmentação por Plano
+            </h3>
+          </div>
+          <SegmentationBars data={data.planSegmentation} />
+          <div className="mt-4 grid grid-cols-3 gap-2 border-t border-slate-100 pt-4 dark:border-slate-700/50">
+            {data.planSegmentation.map((p) => (
+              <div key={p.plan} className="text-center">
+                <p className="text-xs text-slate-500 dark:text-slate-400">{p.label}</p>
+                <p className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                  {formatCurrencyBRL(
+                    p.count * (p.plan === 'essential' ? 97.9 : p.plan === 'pro' ? 117.9 : 297.9),
+                  )}
+                </p>
+                <p className="text-[10px] text-slate-400">/mês</p>
+              </div>
+            ))}
+          </div>
+        </div>
 
-        <Card className="hover:shadow-elevation transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Confirmados Hoje</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-emerald-600">{d.todayConfirmed}</div>
-            <p className="text-xs text-muted-foreground mt-1">Status confirmado</p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-elevation transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Concluídos Hoje</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-accent" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-accent">{d.todayCompleted}</div>
-            <p className="text-xs text-muted-foreground mt-1">Atendimentos finalizados</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-destructive/50 bg-destructive/5 hover:shadow-elevation transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-destructive flex items-center gap-2">
-              No-shows Hoje
-            </CardTitle>
-            <XCircle className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-destructive">{d.todayCancelled}</div>
-            <p className="text-xs text-destructive/80 mt-1">Cancelados / faltas</p>
-          </CardContent>
-        </Card>
-
-        <Card className="hover:shadow-elevation transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Taxa de Comparecimento</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{d.attendanceRate}%</div>
-            <p className="text-xs text-muted-foreground mt-1">Concluídos vs agendados hoje</p>
-          </CardContent>
-        </Card>
+        {/* Rankings */}
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+          <div className="mb-4 flex items-center gap-2">
+            <Trophy className="h-5 w-5 text-amber-500" />
+            <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+              Ranking por Agendamentos
+            </h3>
+          </div>
+          <RankingList
+            items={data.rankingByAppointments}
+            valueLabel="Volume de agendamentos (7 dias)"
+            formatValue={(v) => `${v}`}
+          />
+        </div>
       </div>
 
-      {/* Gráficos */}
-      <div className="grid gap-4 md:grid-cols-7">
-        <Card className="md:col-span-4 hover:shadow-elevation transition-shadow">
-          <CardHeader>
-            <CardTitle>Agendamentos por Dia (7 dias)</CardTitle>
-            <CardDescription>Volume de agendamentos por status nos últimos 7 dias</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={chartConfig} className="h-[300px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={d.chart7Days} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
-                  <XAxis dataKey="label" axisLine={false} tickLine={false} tickMargin={10} />
-                  <YAxis
-                    allowDecimals={false}
-                    axisLine={false}
-                    tickLine={false}
-                    width={32}
-                    domain={[0, maxChartValue]}
-                  />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <ChartLegend content={<ChartLegendContent />} />
-                  <Bar
-                    dataKey="confirmed"
-                    stackId="a"
-                    fill="var(--color-confirmed)"
-                    radius={[0, 0, 0, 0]}
-                  />
-                  <Bar
-                    dataKey="completed"
-                    stackId="a"
-                    fill="var(--color-completed)"
-                    radius={[0, 0, 0, 0]}
-                  />
-                  <Bar
-                    dataKey="scheduled"
-                    stackId="a"
-                    fill="var(--color-scheduled)"
-                    radius={[0, 0, 0, 0]}
-                  />
-                  <Bar
-                    dataKey="cancelled"
-                    stackId="a"
-                    fill="var(--color-cancelled)"
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
-          </CardContent>
-        </Card>
+      {/* Ranking de vendas */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+        <div className="mb-4 flex items-center gap-2">
+          <DollarSign className="h-5 w-5 text-emerald-500" />
+          <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+            Ranking de Vendas por Barbearia
+          </h3>
+        </div>
+        <div className="grid grid-cols-1 gap-x-8 gap-y-1 md:grid-cols-2">
+          <RankingList
+            items={data.rankingBySales}
+            valueLabel="Volume de vendas (7 dias)"
+            formatValue={(v) => formatCurrencyBRL(v)}
+          />
+          <div className="flex flex-col justify-center">
+            <div className="grid grid-cols-2 gap-3 text-center">
+              <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-700/30">
+                <Activity className="mx-auto mb-1 h-5 w-5 text-blue-500" />
+                <p className="text-xs text-slate-500 dark:text-slate-400">Ativas</p>
+                <p className="text-lg font-bold text-slate-800 dark:text-white">
+                  {data.activeTenantsWithAppt}
+                </p>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-700/30">
+                <AlertTriangle className="mx-auto mb-1 h-5 w-5 text-rose-500" />
+                <p className="text-xs text-slate-500 dark:text-slate-400">Churn</p>
+                <p className="text-lg font-bold text-slate-800 dark:text-white">
+                  {data.churnCount}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        <Card className="md:col-span-3 hover:shadow-elevation transition-shadow">
-          <CardHeader>
-            <CardTitle>Serviços Mais Agendados</CardTitle>
-            <CardDescription>Top 5 serviços concluídos (7 dias)</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col items-center justify-center h-[300px]">
-            {d.topServices.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center">
-                Nenhum serviço concluído no período.
-              </p>
-            ) : (
-              <ChartContainer config={pieConfig} className="h-[230px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={d.topServices}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={55}
-                      outerRadius={85}
-                      paddingAngle={3}
-                      dataKey="value"
-                      nameKey="name"
-                    >
-                      {d.topServices.map((entry) => (
-                        <Cell key={`cell-${entry.name}`} fill={entry.fill} />
-                      ))}
-                    </Pie>
-                    <ChartTooltip content={<ChartTooltipContent nameKey="name" />} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            )}
-            {d.topServices.length > 0 && (
-              <div className="flex flex-wrap justify-center gap-3 mt-2">
-                {d.topServices.map((s) => (
-                  <div key={s.name} className="flex items-center gap-1.5 text-xs">
-                    <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: s.fill }} />
-                    <span className="text-muted-foreground">
-                      {s.name} ({s.value})
-                    </span>
+      {/* Métricas operacionais de hoje */}
+      <div>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          Operação Hoje
+        </h2>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <MetricCard
+            icon={Calendar}
+            label="Agendamentos hoje"
+            value={data.todayTotal}
+            accent="bg-blue-100 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300"
+          />
+          <MetricCard
+            icon={CheckCircle2}
+            label="Confirmados hoje"
+            value={data.todayConfirmed}
+            accent="bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300"
+          />
+          <MetricCard
+            icon={Scissors}
+            label="Concluídos hoje"
+            value={data.todayCompleted}
+            sub={`${data.attendanceRate}% de comparecimento`}
+            accent="bg-violet-100 text-violet-600 dark:bg-violet-950/40 dark:text-violet-300"
+          />
+          <MetricCard
+            icon={XCircle}
+            label="Cancelados hoje"
+            value={data.todayCancelled}
+            accent="bg-rose-100 text-rose-600 dark:bg-rose-950/40 dark:text-rose-300"
+          />
+        </div>
+      </div>
+
+      {/* Gráfico 7 dias + top serviços */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 lg:col-span-2">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BarChart3 />
+              <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+                Agendamentos (7 dias)
+              </h3>
+            </div>
+            <div className="flex items-center gap-3 text-xs">
+              <span className="flex items-center gap-1">
+                <span className="h-2.5 w-2.5 rounded-sm bg-blue-500" /> Confirmados
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" /> Concluídos
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="h-2.5 w-2.5 rounded-sm bg-rose-400" /> Cancelados
+              </span>
+            </div>
+          </div>
+          <BarChart data={data.chart7Days} />
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+          <div className="mb-4 flex items-center gap-2">
+            <Award className="h-5 w-5 text-amber-500" />
+            <h3 className="text-base font-semibold text-slate-900 dark:text-white">Top Serviços</h3>
+          </div>
+          {data.topServices.length === 0 ? (
+            <div className="py-8 text-center text-sm text-slate-400">Sem dados suficientes</div>
+          ) : (
+            <div className="space-y-3">
+              {data.topServices.map((s, i) => {
+                const max = Math.max(...data.topServices.map((x) => x.value), 1)
+                const pct = (s.value / max) * 100
+                return (
+                  <div key={s.name}>
+                    <div className="mb-1 flex items-center justify-between text-sm">
+                      <span className="truncate font-medium text-slate-700 dark:text-slate-200">
+                        {i + 1}. {s.name}
+                      </span>
+                      <span className="text-slate-500 dark:text-slate-400">{s.value}x</span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-700/50">
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: `${pct}%`, backgroundColor: s.fill }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Próximos agendamentos + fidelidade */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800 lg:col-span-2">
+          <div className="mb-4 flex items-center gap-2">
+            <Clock className="h-5 w-5 text-blue-500" />
+            <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+              Próximos Agendamentos
+            </h3>
+          </div>
+          {data.upcomingAppointments.length === 0 ? (
+            <div className="py-8 text-center text-sm text-slate-400">
+              Nenhum agendamento próximo
+            </div>
+          ) : (
+            <div>
+              {data.upcomingAppointments.map((a) => (
+                <UpcomingRow key={a.id} a={a} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+            <div className="mb-3 flex items-center gap-2">
+              <Award className="h-5 w-5 text-amber-500" />
+              <h3 className="text-base font-semibold text-slate-900 dark:text-white">Fidelidade</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-center">
+              <div className="rounded-lg bg-amber-50 p-3 dark:bg-amber-950/20">
+                <p className="text-2xl font-bold text-amber-600 dark:text-amber-300">
+                  {data.loyaltyReadyCount}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Recompensas prontas</p>
+              </div>
+              <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-700/30">
+                <p className="text-2xl font-bold text-slate-800 dark:text-white">
+                  {data.stampsThisMonth}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Selos no mês</p>
+              </div>
+            </div>
+          </div>
+
+          {data.pendingTenants.length > 0 && (
+            <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-800">
+              <div className="mb-3 flex items-center gap-2">
+                <Users className="h-5 w-5 text-blue-500" />
+                <h3 className="text-base font-semibold text-slate-900 dark:text-white">
+                  Cadastros Pendentes
+                </h3>
+              </div>
+              <div className="space-y-2">
+                {data.pendingTenants.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between border-b border-slate-100 pb-2 last:border-0 last:pb-0 dark:border-slate-700/50"
+                  >
+                    <div>
+                      <p className="text-sm font-medium text-slate-800 dark:text-slate-100">
+                        {p.nome_negocio}
+                      </p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{p.email}</p>
+                    </div>
+                    <span className="text-xs text-slate-400">{formatDateBR(p.created_at)}</span>
                   </div>
                 ))}
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Resumo fidelidade */}
-      <Card className="border-accent/30 bg-accent/5 hover:shadow-elevation transition-shadow">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <div>
-            <CardTitle className="flex items-center gap-2 font-serif text-xl">
-              <Gift className="h-5 w-5 text-accent" /> Resumo de Fidelidade
-            </CardTitle>
-            <CardDescription>Cartões fidelidade e recompensas liberadas</CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-lg border bg-card p-4">
-            <div className="text-3xl font-bold text-accent">{d.loyaltyReadyCount}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Clientes com recompensa liberada (is_reward_ready)
-            </p>
-          </div>
-          <div className="rounded-lg border bg-card p-4">
-            <div className="text-3xl font-bold">{d.stampsThisMonth}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Carimbos contabilizados no mês atual
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Tabelas */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Próximos agendamentos */}
-        <Card className="hover:shadow-elevation transition-shadow">
-          <CardHeader className="border-b bg-muted/20 pb-4 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="font-serif text-xl">Próximos Agendamentos</CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              asChild
-              className="hover:bg-accent/10 hover:text-accent"
-            >
-              <Link to="/admin/agendamentos">
-                Ver todos <ArrowRight className="h-4 w-4 ml-1" />
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="pl-4">Data/Hora</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Serviço</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right pr-4">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {d.upcomingAppointments.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                      Nenhum agendamento próximo.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  d.upcomingAppointments.map((appt) => {
-                    const meta = STATUS_META[appt.status] || {
-                      label: appt.status,
-                      variant: 'outline' as const,
-                    }
-                    const isLoading =
-                      actionLoading === appt.id + 'confirm' ||
-                      actionLoading === appt.id + 'complete' ||
-                      actionLoading === appt.id + 'cancel'
-                    return (
-                      <TableRow key={appt.id} className="hover:bg-muted/30">
-                        <TableCell className="pl-4 text-sm">
-                          <div className="flex items-center gap-1.5">
-                            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span>{formatDateBR(appt.start_time)}</span>
-                            <span className="text-muted-foreground">
-                              {formatTimeHHMM(appt.start_time)}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm font-medium">
-                          {appt.customer?.name || '—'}
-                        </TableCell>
-                        <TableCell className="text-sm">{appt.service?.name || '—'}</TableCell>
-                        <TableCell>
-                          <Badge variant={meta.variant}>{meta.label}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right pr-4">
-                          <div className="flex items-center justify-end gap-1">
-                            {appt.status === 'scheduled' && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7 hover:bg-emerald-100 hover:text-emerald-600"
-                                title="Confirmar"
-                                disabled={isLoading}
-                                onClick={() => handleQuickAction(appt, 'confirm')}
-                              >
-                                <Check className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {(appt.status === 'scheduled' || appt.status === 'confirmed') && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7 hover:bg-accent/15 hover:text-accent"
-                                title="Concluir"
-                                disabled={isLoading}
-                                onClick={() => handleQuickAction(appt, 'complete')}
-                              >
-                                <CheckCircle2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {appt.status !== 'cancelled' && appt.status !== 'completed' && (
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-7 w-7 hover:bg-red-100 hover:text-red-600"
-                                title="Cancelar"
-                                disabled={isLoading}
-                                onClick={() => handleQuickAction(appt, 'cancel')}
-                              >
-                                <Ban className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        {/* Cadastros pendentes */}
-        <Card className="hover:shadow-elevation transition-shadow">
-          <CardHeader className="border-b bg-muted/20 pb-4 flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="font-serif text-xl">Cadastros Pendentes</CardTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              asChild
-              className="hover:bg-accent/10 hover:text-accent"
-            >
-              <Link to="/admin/cadastros">
-                Ver todos <ArrowRight className="h-4 w-4 ml-1" />
-              </Link>
-            </Button>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="pl-4">Negócio</TableHead>
-                  <TableHead>Responsável</TableHead>
-                  <TableHead>Cidade</TableHead>
-                  <TableHead className="text-right pr-4">Ação</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {d.pendingTenants.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                      Nenhum cadastro pendente. 🎉
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  d.pendingTenants.map((t) => (
-                    <TableRow key={t.id} className="hover:bg-muted/30">
-                      <TableCell className="pl-4 text-sm font-medium">{t.nome_negocio}</TableCell>
-                      <TableCell className="text-sm">
-                        <div>{t.full_name}</div>
-                        <div className="text-xs text-muted-foreground">{t.email}</div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {t.cidade ? `${t.cidade}/${t.estado || ''}` : '—'}
-                      </TableCell>
-                      <TableCell className="text-right pr-4">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          asChild
-                          className="hover:bg-accent/10 hover:text-accent"
-                        >
-                          <Link to="/admin/cadastros">
-                            <Eye className="h-4 w-4 mr-1" /> Analisar
-                          </Link>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
+      <p className="pt-2 text-center text-xs text-slate-400">
+        Dashboard administrativo · Dados dos últimos 7 dias operacionais
+      </p>
     </div>
   )
 }
