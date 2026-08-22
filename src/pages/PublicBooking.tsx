@@ -24,6 +24,13 @@ import {
   LifeBuoy,
   X,
   Send,
+  ShoppingCart,
+  ShoppingBag,
+  Plus,
+  Minus,
+  Package,
+  Trash2,
+  Image as ImageIcon,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { ptBR } from 'date-fns/locale'
@@ -34,6 +41,7 @@ import {
   getTenantData,
   getSlots,
   createBooking,
+  finalizeProductsBooking,
   calculateSlotsWithSchedules,
   groupSlotsByPeriod,
   fetchMonthRawData,
@@ -47,15 +55,24 @@ import {
   type SlotAppointment,
   type MonthSlotData,
 } from '@/services/public-booking'
-import { startAppointmentCheckout } from '@/services/stripe-checkout'
+import { startAppointmentCheckout, startPublicBookingCheckout } from '@/services/stripe-checkout'
+import { getPublicProducts } from '@/services/products'
 import { formatLocalDateYYYYMMDD } from '@/lib/date-utils'
 import { cn } from '@/lib/utils'
 import { manifestUrl } from '@/services/totem-pwa'
-import type { SubscriptionPlan } from '@/types'
+import type { SubscriptionPlan, Product } from '@/types'
 import { hasActiveSubscription } from '@/services/subscriptions'
 
 const fmtPrice = (v: number) =>
   Number(v).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
+interface CartItem {
+  product_id: string
+  name: string
+  price: number
+  quantity: number
+  image_url: string | null
+}
 
 export default function PublicBooking() {
   const { tenantId, slug } = useParams<{ tenantId: string; slug: string }>()
@@ -119,6 +136,13 @@ export default function PublicBooking() {
   const [availableDates, setAvailableDates] = useState<Set<string>>(new Set())
 
   const summaryRef = useRef<HTMLDivElement>(null)
+
+  // --- Carrinho de produtos pós-agendamento ---
+  const [postBooking, setPostBooking] = useState<'idle' | 'offer' | 'summary'>('idle')
+  const [cart, setCart] = useState<CartItem[]>([])
+  const [publicProducts, setPublicProducts] = useState<Product[]>([])
+  const [lastAppointment, setLastAppointment] = useState<{ id: string } | null>(null)
+  const [cartProcessing, setCartProcessing] = useState(false)
 
   // Resolve o tenant a partir do tenantId (rota /book/:tenantId) ou do slug
   // (rota /agendar/:slug usada pelo Totem PWA).
@@ -262,6 +286,47 @@ export default function PublicBooking() {
     })
   }, [resolvedTenantId, stripeEnabled])
 
+  // Carrinho: persiste em sessionStorage para não perder ao navegar.
+  useEffect(() => {
+    if (!resolvedTenantId) return
+    const key = `na-regua-cart-${resolvedTenantId}`
+    try {
+      const raw = sessionStorage.getItem(key)
+      if (raw) setCart(JSON.parse(raw))
+    } catch {
+      /* ignore */
+    }
+  }, [resolvedTenantId])
+
+  useEffect(() => {
+    if (!resolvedTenantId) return
+    const key = `na-regua-cart-${resolvedTenantId}`
+    try {
+      sessionStorage.setItem(key, JSON.stringify(cart))
+    } catch {
+      /* ignore */
+    }
+  }, [cart, resolvedTenantId])
+
+  // Retorno do Stripe Checkout (pós-agendamento com produtos): se voltou
+  // com ?paid=1&appt=..., mostra a tela de sucesso.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const paid = params.get('paid')
+    const apptId = params.get('appt')
+    if (paid === '1' && apptId) {
+      setLastAppointment((prev) => prev || { id: apptId })
+      setPostBooking('idle')
+      setCart([])
+      setDone(true)
+      if (resolvedTenantId) {
+        getPublicSubscriptionPlans(resolvedTenantId).then(({ data }) => {
+          if (data && data.length > 0) setPlans(data)
+        })
+      }
+    }
+  }, [resolvedTenantId])
+
   const handleBook = async (opts?: { prepay?: boolean; useCredit?: boolean }) => {
     if (!resolvedTenantId || !selectedService || !selectedSlot || !customer) return
     setBooking(true)
@@ -392,7 +457,7 @@ export default function PublicBooking() {
     }
 
     // === Caminho D: fluxo normal sem pagamento ===
-    const { error } = await createBooking({
+    const { data: bookingData, error } = await createBooking({
       tenant_id: resolvedTenantId,
       service_id: selectedService.id,
       customer_id: customer.id,
@@ -408,15 +473,129 @@ export default function PublicBooking() {
         variant: 'destructive',
       })
     } else {
-      setDone(true)
+      setLastAppointment(bookingData?.appointment || null)
       toast({ title: 'Agendamento confirmado!' })
       if (resolvedTenantId) {
         getPublicSubscriptionPlans(resolvedTenantId).then(({ data }) => {
           if (data && data.length > 0) setPlans(data)
         })
         hasActiveSubscription(customer.id, resolvedTenantId).then(setIsSubscriber)
+        // Verifica se há produtos para oferecer no pós-agendamento.
+        getPublicProducts(resolvedTenantId).then(({ data: prods }) => {
+          if (prods && prods.length > 0) {
+            setPublicProducts(prods)
+            setPostBooking('offer')
+          } else {
+            setDone(true)
+          }
+        })
+      } else {
+        setDone(true)
       }
     }
+  }
+
+  // --- Handlers do carrinho pós-agendamento ---
+  const addToCart = (p: Product) => {
+    setCart((prev) => {
+      const existing = prev.find((c) => c.product_id === p.id)
+      if (existing) {
+        return prev.map((c) => (c.product_id === p.id ? { ...c, quantity: c.quantity + 1 } : c))
+      }
+      return [
+        ...prev,
+        {
+          product_id: p.id,
+          name: p.name,
+          price: Number(p.price),
+          quantity: 1,
+          image_url: p.image_url ?? null,
+        },
+      ]
+    })
+  }
+
+  const updateQty = (productId: string, delta: number) => {
+    setCart((prev) =>
+      prev
+        .map((c) => (c.product_id === productId ? { ...c, quantity: c.quantity + delta } : c))
+        .filter((c) => c.quantity > 0),
+    )
+  }
+
+  const removeFromCart = (productId: string) => {
+    setCart((prev) => prev.filter((c) => c.product_id !== productId))
+  }
+
+  const skipProducts = () => {
+    setCart([])
+    setPostBooking('idle')
+    setDone(true)
+  }
+
+  const handlePayAtBarbershop = async () => {
+    if (!resolvedTenantId || !lastAppointment) {
+      setPostBooking('idle')
+      setDone(true)
+      return
+    }
+    setCartProcessing(true)
+    if (cart.length > 0) {
+      await finalizeProductsBooking({
+        appointment_id: lastAppointment.id,
+        tenant_id: resolvedTenantId,
+        items: cart.map((c) => ({
+          product_id: c.product_id,
+          quantity: c.quantity,
+          unit_price: c.price,
+        })),
+      })
+    }
+    setCartProcessing(false)
+    setCart([])
+    setPostBooking('idle')
+    setDone(true)
+  }
+
+  const handlePayNow = async () => {
+    if (!resolvedTenantId || !lastAppointment || !selectedService) {
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível processar o pagamento.',
+        variant: 'destructive',
+      })
+      return
+    }
+    setCartProcessing(true)
+    const serviceAmountCents = Math.round(Number(selectedService.price) * 100)
+    const cartItems = cart.map((c) => ({
+      name: c.name,
+      price_cents: Math.round(c.price * 100),
+      quantity: c.quantity,
+    }))
+    const productIds = cart.map((c) => c.product_id)
+    const successUrl = `${window.location.origin}/agendar/${tenant?.slug || resolvedTenantId}?paid=1&appt=${lastAppointment.id}`
+    const cancelUrl = `${window.location.origin}/agendar/${tenant?.slug || resolvedTenantId}`
+    const { data, error: checkoutError } = await startPublicBookingCheckout({
+      appointment_id: lastAppointment.id,
+      service_amount: serviceAmountCents,
+      customer_name: customer?.name,
+      customer_email: customer?.email || undefined,
+      cart_items: cartItems,
+      product_ids: productIds,
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+    })
+    setCartProcessing(false)
+    if (checkoutError || !data?.url) {
+      toast({
+        title: 'Erro no pagamento',
+        description: checkoutError?.message || 'Não foi possível iniciar o pagamento.',
+        variant: 'destructive',
+      })
+      return
+    }
+    window.location.href = data.url
   }
 
   const handleSubscribe = async () => {
@@ -464,6 +643,292 @@ export default function PublicBooking() {
           Não foi possível carregar os dados desta barbearia. Verifique o link ou tente novamente
           mais tarde.
         </p>
+      </div>
+    )
+  }
+
+  // --- ETAPA PÓS-AGENDAMENTO: oferta de produtos ---
+  if (postBooking === 'offer') {
+    const cartCount = cart.reduce((acc, c) => acc + c.quantity, 0)
+    return (
+      <div className="relative min-h-screen bg-background">
+        <div className="absolute top-0 left-0 right-0 h-1 barber-pole-stripes z-50" />
+        <main className="mx-auto max-w-2xl px-4 md:px-6 py-6 md:py-8 space-y-6">
+          {/* Confirmação do agendamento */}
+          <Card className="border-success/40 bg-success/5">
+            <CardContent className="flex items-center gap-3 p-4">
+              <CheckCircle2 className="h-5 w-5 text-success shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold">Agendamento confirmado!</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {selectedService?.name} · {selectedDateObj?.toLocaleDateString('pt-BR')} ·{' '}
+                  {selectedSlot}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Título da oferta */}
+          <div className="text-center space-y-2 animate-fade-in-up">
+            <ShoppingBag className="h-10 w-10 text-accent mx-auto" />
+            <h2 className="text-2xl font-bold">Aproveite e leve para casa! 🛍️</h2>
+            <p className="text-muted-foreground text-sm">
+              Adicione produtos da barbearia ao seu pedido
+            </p>
+          </div>
+
+          {/* Grid de produtos */}
+          <div className="grid grid-cols-2 gap-3 md:gap-4">
+            {publicProducts.map((p) => {
+              const inCart = cart.find((c) => c.product_id === p.id)
+              return (
+                <Card
+                  key={p.id}
+                  className="overflow-hidden hover:shadow-md transition-all duration-200"
+                >
+                  <div className="aspect-square bg-muted/40">
+                    {p.image_url ? (
+                      <img src={p.image_url} alt={p.name} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center">
+                        <ImageIcon className="h-8 w-8 text-muted-foreground/40" />
+                      </div>
+                    )}
+                  </div>
+                  <CardContent className="p-3 space-y-2">
+                    <p className="font-semibold text-sm truncate">{p.name}</p>
+                    <p className="font-bold text-accent">{fmtPrice(Number(p.price))}</p>
+                    {inCart ? (
+                      <div className="flex items-center justify-between gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 touch-manipulation"
+                          onClick={() => updateQty(p.id, -1)}
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </Button>
+                        <span className="font-semibold text-sm">{inCart.quantity}</span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 touch-manipulation"
+                          onClick={() => updateQty(p.id, 1)}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-full min-h-[40px] touch-manipulation"
+                        onClick={() => addToCart(p)}
+                      >
+                        <Plus className="h-3.5 w-3.5 mr-1" /> Adicionar
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+
+          {/* Ações */}
+          <div className="flex gap-3 pt-2">
+            <Button
+              variant="ghost"
+              className="flex-1 min-h-[48px] text-muted-foreground touch-manipulation"
+              onClick={skipProducts}
+            >
+              Pular
+            </Button>
+            {cartCount > 0 && (
+              <Button
+                variant="amber"
+                className="flex-1 min-h-[48px] touch-manipulation"
+                onClick={() => setPostBooking('summary')}
+              >
+                <ShoppingCart className="h-4 w-4 mr-2" /> Ver Carrinho ({cartCount}{' '}
+                {cartCount === 1 ? 'item' : 'itens'})
+              </Button>
+            )}
+          </div>
+        </main>
+        <SupportFAB />
+      </div>
+    )
+  }
+
+  // --- ETAPA PÓS-AGENDAMENTO: resumo final (carrinho + agendamento) ---
+  if (postBooking === 'summary') {
+    const cartTotal = cart.reduce((acc, c) => acc + c.price * c.quantity, 0)
+    const serviceTotal = selectedService ? Number(selectedService.price) : 0
+    const grandTotal = serviceTotal + cartTotal
+    const cartCount = cart.reduce((acc, c) => acc + c.quantity, 0)
+    const canPayOnline = stripeEnabled && prepaymentEnabled
+
+    return (
+      <div className="relative min-h-screen bg-background">
+        <div className="absolute top-0 left-0 right-0 h-1 barber-pole-stripes z-50" />
+        <main className="mx-auto max-w-2xl px-4 md:px-6 py-6 md:py-8 space-y-5">
+          <h2 className="text-xl font-bold">Resumo do seu pedido</h2>
+
+          {/* Card: Seu Agendamento */}
+          <Card className="border-accent/30">
+            <CardContent className="p-4 space-y-2">
+              <p className="font-semibold flex items-center gap-2 text-sm md:text-base">
+                <Scissors className="h-4 w-4 text-accent" /> Seu Agendamento
+              </p>
+              <div className="text-sm space-y-1.5">
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground">Serviço</span>
+                  <span className="font-medium text-right truncate">{selectedService?.name}</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground">Data</span>
+                  <span className="font-medium">
+                    {selectedDateObj?.toLocaleDateString('pt-BR')}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground">Horário</span>
+                  <span className="font-medium">{selectedSlot}</span>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <span className="text-muted-foreground">Profissional</span>
+                  <span className="font-medium">{selectedBarber || 'Qualquer um'}</span>
+                </div>
+                <div className="flex justify-between border-t pt-1.5">
+                  <span className="text-muted-foreground">Valor</span>
+                  <span className="font-bold">{fmtPrice(serviceTotal)}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card: Seus Produtos */}
+          {cart.length > 0 && (
+            <Card>
+              <CardContent className="p-4 space-y-3">
+                <p className="font-semibold flex items-center gap-2 text-sm md:text-base">
+                  <Package className="h-4 w-4 text-accent" /> Seus Produtos
+                </p>
+                {cart.map((c) => (
+                  <div key={c.product_id} className="flex items-center gap-3">
+                    <div className="h-12 w-12 shrink-0 rounded-lg bg-muted/40 overflow-hidden flex items-center justify-center">
+                      {c.image_url ? (
+                        <img
+                          src={c.image_url}
+                          alt={c.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <ImageIcon className="h-5 w-5 text-muted-foreground/40" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{c.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {c.quantity}x {fmtPrice(c.price)}
+                      </p>
+                    </div>
+                    <span className="font-semibold text-sm shrink-0">
+                      {fmtPrice(c.price * c.quantity)}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 shrink-0 hover:text-destructive"
+                      onClick={() => removeFromCart(c.product_id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+                <div className="border-t pt-2 flex justify-between">
+                  <span className="text-sm text-muted-foreground">Subtotal produtos</span>
+                  <span className="font-bold">{fmtPrice(cartTotal)}</span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Total */}
+          <Card className="border-accent/40 bg-accent/5">
+            <CardContent className="p-4 flex justify-between items-center">
+              <span className="font-semibold text-base">Total</span>
+              <span className="text-2xl font-bold text-accent">{fmtPrice(grandTotal)}</span>
+            </CardContent>
+          </Card>
+
+          {/* Opções de pagamento */}
+          <div className="space-y-3">
+            {canPayOnline ? (
+              <>
+                <Button
+                  variant="amber"
+                  size="lg"
+                  className="w-full min-h-[56px] touch-manipulation shadow-lg"
+                  disabled={cartProcessing}
+                  onClick={handlePayNow}
+                >
+                  {cartProcessing ? (
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                  ) : (
+                    <CreditCard className="h-5 w-5 mr-2" />
+                  )}
+                  Pagar agora (PIX/Cartão) · {fmtPrice(grandTotal)}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="w-full min-h-[48px] touch-manipulation"
+                  disabled={cartProcessing}
+                  onClick={handlePayAtBarbershop}
+                >
+                  Pagar na barbearia
+                </Button>
+              </>
+            ) : (
+              <div className="space-y-2">
+                <Button
+                  variant="amber"
+                  size="lg"
+                  className="w-full min-h-[56px] touch-manipulation shadow-lg"
+                  disabled={cartProcessing}
+                  onClick={handlePayAtBarbershop}
+                >
+                  {cartProcessing ? (
+                    <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                  ) : (
+                    <Store className="h-5 w-5 mr-2" />
+                  )}
+                  Pagar na barbearia
+                </Button>
+                <p className="text-center text-xs text-muted-foreground bg-muted/50 rounded-md py-2 px-3">
+                  Pagamento online em breve
+                </p>
+              </div>
+            )}
+            <Button
+              variant="ghost"
+              className="w-full min-h-[48px] touch-manipulation"
+              disabled={cartProcessing}
+              onClick={() => setPostBooking('offer')}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" /> Voltar aos produtos
+            </Button>
+          </div>
+
+          {/* Contador do carrinho no rodapé */}
+          {cartCount > 0 && (
+            <p className="text-center text-xs text-muted-foreground">
+              {cartCount} {cartCount === 1 ? 'item' : 'itens'} no carrinho · {fmtPrice(cartTotal)}
+            </p>
+          )}
+        </main>
+        <SupportFAB />
       </div>
     )
   }

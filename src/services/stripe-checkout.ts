@@ -83,6 +83,47 @@ export async function startAppointmentCheckout(
 }
 
 /**
+ * Cenário 2b — Agendamento + Produtos (fluxo pós-agendamento do link público).
+ * O agendamento deve ter sido salvo ANTES com status 'pending_payment'.
+ * Cria um Checkout Session com line_items = serviço + produtos do carrinho.
+ */
+export interface PublicBookingCheckoutInput {
+  appointment_id: string
+  service_amount: number // serviço em centavos
+  customer_name?: string
+  customer_email?: string
+  cart_items: { name: string; price_cents: number; quantity: number }[]
+  product_ids: string[]
+  success_url?: string
+  cancel_url?: string
+}
+
+export async function startPublicBookingCheckout(
+  input: PublicBookingCheckoutInput,
+): Promise<{ data: { url: string; session_id: string } | null; error: any }> {
+  const { data, error } = await supabase.functions.invoke('stripe-create-checkout', {
+    body: {
+      scenario: 'public_booking',
+      source: 'public_booking',
+      appointment_id: input.appointment_id,
+      service_amount: input.service_amount,
+      customer_name: input.customer_name,
+      customer_email: input.customer_email,
+      // Inclui o product_id em cada item do carrinho para que o webhook possa
+      // reconstruir as quantidades sem precisar chamar a API do Stripe.
+      cart_items: input.cart_items.map((c, i) => ({
+        ...c,
+        product_id: input.product_ids[i],
+      })),
+      product_ids: input.product_ids,
+      success_url: input.success_url,
+      cancel_url: input.cancel_url,
+    },
+  })
+  return { data, error }
+}
+
+/**
  * Cenário 3 — Assinatura: cliente final assinando plano recorrente da barbearia.
  * Busca cliente por CPF no tenant (cria se não existir).
  * application_fee_percent = 2.0 (comissão da plataforma em todas as renovações).

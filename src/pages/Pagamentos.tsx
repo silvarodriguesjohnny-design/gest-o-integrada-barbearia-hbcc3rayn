@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { CreditCard, Loader2, RefreshCw, ShieldCheck, Lock, Plus, Sparkles } from 'lucide-react'
+import { CreditCard, Loader2, RefreshCw, ShieldCheck, Plus, Sparkles } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
 import { getStripeConfigStatus } from '@/services/stripe-config'
@@ -61,8 +61,10 @@ export default function Pagamentos() {
 
   const handleToggle = async (checked: boolean) => {
     if (!tenantId || saving) return
-    // Só habilitado se o Stripe plataforma foi configurado pelo administrador.
-    if (!stripeReady) return
+    // O toggle salva a preferência do tenant SEMPRE, independente do Stripe
+    // estar configurado pelo admin. Se ainda não estiver, a preferência fica
+    // registrada e os pagamentos antecipados são ativados automaticamente
+    // quando o admin configurar o Stripe.
     setSaving(true)
     const { error } = await db
       .from('tenants')
@@ -116,7 +118,7 @@ export default function Pagamentos() {
       {/* ============================================================ */}
       {/* SEÇÃO 2 — Pagamento Antecipado (toggle)                      */}
       {/* ============================================================ */}
-      <Card className={!stripeConfigured ? 'opacity-70' : ''}>
+      <Card>
         <CardContent className="p-6 space-y-6">
           <div className="flex flex-col gap-2">
             <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -141,7 +143,7 @@ export default function Pagamentos() {
               <Switch
                 className="switch-lg"
                 checked={prepaymentEnabled}
-                disabled={!stripeConfigured || saving}
+                disabled={saving}
                 onCheckedChange={handleToggle}
                 aria-label="Receber pagamento antecipado na agenda"
               />
@@ -163,18 +165,14 @@ export default function Pagamentos() {
           </p>
 
           {!stripeConfigured ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50/60 dark:bg-amber-950/20 p-4 text-sm flex items-start gap-3">
-              <Lock className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold text-amber-800 dark:text-amber-300">
-                  Pagamento antecipado ainda não disponível. Aguarde a ativação pelo administrador.
-                </p>
-              </div>
-            </div>
+            <p className="text-sm text-muted-foreground text-center max-w-md mx-auto">
+              O administrador ainda não configurou o Stripe. Quando estiver pronto, seus pagamentos
+              antecipados serão ativados automaticamente.
+            </p>
           ) : (
-            <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-              <Lock className="h-3.5 w-3.5" />
-              Plataforma de pagamentos ativada pelo administrador.
+            <div className="flex items-center justify-center gap-2 text-sm text-success">
+              <ShieldCheck className="h-4 w-4" />
+              Plataforma de pagamentos ativada pelo administrador. ✅
             </div>
           )}
 

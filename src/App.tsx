@@ -14,6 +14,7 @@ import Agenda from './pages/Agenda'
 import Financeiro from './pages/Financeiro'
 import Servicos from './pages/Servicos'
 import Estoque from './pages/Estoque'
+import Produtos from './pages/Produtos'
 import Campanhas from './pages/Campanhas'
 import Settings from './pages/Settings'
 import Pagamentos from './pages/Pagamentos'
@@ -158,6 +159,7 @@ const App = () => (
           <Route path="/dashboard/mensagens" element={<EnvioManual />} />
           <Route path="/mensagens" element={<Navigate to="/dashboard/mensagens" replace />} />
           <Route path="/dashboard/servicos" element={<Servicos />} />
+          <Route path="/dashboard/produtos" element={<Produtos />} />
           <Route path="/dashboard/assinaturas" element={<Assinaturas />} />
           <Route path="/dashboard/assinaturas/confirmacao" element={<AssinaturaSucesso />} />
           <Route path="/dashboard/configuracoes" element={<Settings />} />

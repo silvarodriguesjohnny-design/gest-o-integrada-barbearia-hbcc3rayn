@@ -151,6 +151,107 @@ Deno.serve(async (req: Request) => {
       }
 
       // -------------------------------------------------------------------
+      // CENÁRIO 2b — Agendamento + Produtos: cliente final pagou agendamento
+      // + carrinho de produtos (fluxo pós-agendamento do link público).
+      // Confirma o agendamento, dispara a notificação e registra product_sales.
+      // -------------------------------------------------------------------
+      else if (scenario === 'public_booking' && appointmentId && tenantId) {
+        // 1. Confirma o agendamento (pending_payment -> scheduled).
+        const { data: appt } = await supabase
+          .from('appointments')
+          .select('id, status')
+          .eq('id', appointmentId)
+          .maybeSingle()
+        if (appt && appt.status === 'pending_payment') {
+          await supabase
+            .from('appointments')
+            .update({ status: 'scheduled' })
+            .eq('id', appointmentId)
+          // Dispara a notificação de confirmação.
+          try {
+            await fetch(`${supabaseUrl}/functions/v1/send-appointment-notification`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${supabaseServiceKey}`,
+              },
+              body: JSON.stringify({ appointment_id: appointmentId, type: 'confirmation' }),
+            })
+          } catch (notifyErr) {
+            console.error('[stripe-webhook] public_booking notification error:', String(notifyErr))
+          }
+        }
+
+        // 2. Registra a comissão da plataforma (2%) sobre o total pago.
+        const amountTotal = Number(session.amount_total || 0)
+        const commission = Math.round(amountTotal * 0.02) / 100
+        try {
+          await supabase.from('platform_earnings').insert({
+            tenant_id: tenantId,
+            amount: commission,
+            fee_percent: 2.0,
+            source_type: 'appointment',
+            source_id: appointmentId,
+            stripe_charge_id: session.payment_intent || null,
+            status: session.metadata?.connect_account_id ? 'transferred' : 'pending',
+          })
+        } catch (earnErr) {
+          console.error('[stripe-webhook] public_booking platform_earnings error:', String(earnErr))
+        }
+
+        // 3. Registra as vendas de produtos (online).
+        // Recupera os product_ids do metadata e busca os preços reais para
+        // registrar unit_price/total corretamente. Quantidade derivada do
+        // line_items (price_data.name + unit_amount + quantity).
+        const productIdsRaw = String(session.metadata?.product_ids || '')
+          .split(',')
+          .map((s: string) => s.trim())
+          .filter(Boolean)
+        if (productIdsRaw.length > 0) {
+          const { data: productsRows } = await supabase
+            .from('products')
+            .select('id, name, price')
+            .in('id', productIdsRaw)
+          const priceMap = new Map<string, number>()
+          for (const p of productsRows || []) {
+            priceMap.set(p.id, Number(p.price) || 0)
+          }
+
+          // Reconstrói as quantidades a partir dos line_items do checkout
+          // (cada produto tem um price_data com name + unit_amount + quantity).
+          const lineItems = Array.isArray(session.line_items?.data) ? session.line_items.data : []
+          // Para cada product_id, encontra o line item correspondente pelo
+          // nome (price_data.name == product.name) e registra a quantidade.
+          const salesRows: any[] = []
+          for (const pid of productIdsRaw) {
+            const prodName = (productsRows || []).find((p: any) => p.id === pid)?.name || ''
+            const unitPrice = priceMap.get(pid) || 0
+            // Busca o line item cujo name coincide com o nome do produto.
+            const li = lineItems.find(
+              (l: any) => l?.description === prodName || l?.name === prodName,
+            )
+            const qty = Math.max(1, Number(li?.quantity || 1))
+            salesRows.push({
+              appointment_id: appointmentId,
+              tenant_id: tenantId,
+              product_id: pid,
+              quantity: qty,
+              unit_price: unitPrice,
+              total: qty * unitPrice,
+              payment_method: 'online',
+            })
+          }
+          if (salesRows.length > 0) {
+            try {
+              await supabase.from('product_sales').insert(salesRows)
+            } catch (saleErr) {
+              console.error('[stripe-webhook] product_sales insert error:', String(saleErr))
+            }
+          }
+        }
+      }
+
+      // -------------------------------------------------------------------
       // CENÁRIO 3 — Assinatura: cliente final assinando plano recorrente
       // -------------------------------------------------------------------
       else if (scenario === 'subscription_client' && clientId && tenantId) {

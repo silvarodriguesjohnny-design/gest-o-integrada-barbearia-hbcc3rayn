@@ -54,6 +54,7 @@ const NAV_ITEMS = [
   { name: 'Agenda', path: '/dashboard/agenda', icon: Calendar },
   { name: 'Clientes', path: '/dashboard/clientes', icon: Users },
   { name: 'Serviços', path: '/dashboard/servicos', icon: Scissors },
+  { name: 'Produtos', path: '/dashboard/produtos', icon: Package },
   { name: 'Financeiro', path: '/dashboard/financeiro', icon: DollarSign },
   { name: 'Estoque', path: '/dashboard/estoque', icon: Package },
   { name: 'Assinaturas', path: '/dashboard/assinaturas', icon: RefreshCw },

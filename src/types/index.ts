@@ -80,6 +80,22 @@ export interface Product {
   stock_quantity?: number
   min_stock?: number
   cost_price?: number | null
+  image_url?: string | null
+  category?: string
+  active?: boolean
+  updated_at?: string
+}
+
+export interface ProductSale {
+  id: string
+  appointment_id: string | null
+  tenant_id: string
+  product_id: string
+  quantity: number
+  unit_price: number
+  total: number
+  payment_method: string
+  created_at: string
 }
 
 export type StockMovementType = 'entrada' | 'saida'

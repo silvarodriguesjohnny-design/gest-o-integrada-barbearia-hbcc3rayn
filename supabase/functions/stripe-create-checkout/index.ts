@@ -175,6 +175,127 @@ Deno.serve(async (req: Request) => {
     }
 
     // =====================================================================
+    // CENÁRIO 2b — Agendamento + Produtos: cliente final pagando agendamento
+    // e carrinho de produtos num único Checkout Session (fluxo pós-agendamento).
+    // O agendamento deve ter sido salvo ANTES com status 'pending_payment'.
+    // line_items = serviço + cada produto do carrinho.
+    // metadata: appointment_id, tenant_id, product_ids, source, scenario.
+    // =====================================================================
+    if (scenario === 'public_booking' || body.source === 'public_booking') {
+      const appointmentId = String(body.appointment_id || '')
+      const customerName = String(body.customer_name || '')
+      const customerEmail = String(body.customer_email || '')
+      const serviceAmountCents = Number(body.service_amount) || 0 // serviço em centavos
+      const successUrl = body.success_url || `${appUrl}/agendar/sucesso`
+      const cancelUrl = body.cancel_url || `${appUrl}/agendar/cancelado`
+
+      // Cart vindo do front: [{ name, price_cents, quantity, product_id }, ...]
+      const cartItems: Array<{ name: string; price_cents: number; quantity: number }> =
+        Array.isArray(body.cart_items) ? body.cart_items : []
+
+      if (!appointmentId) {
+        return json({ error: 'appointment_id obrigatório.' }, 400)
+      }
+
+      // Recupera o tenant_id a partir do appointment.
+      const { data: appointment } = await supabase
+        .from('appointments')
+        .select('id, tenant_id, status')
+        .eq('id', appointmentId)
+        .maybeSingle()
+
+      if (!appointment) {
+        return json({ error: 'Agendamento não encontrado.' }, 404)
+      }
+      const tenantId = appointment.tenant_id
+      if (!tenantId) {
+        return json({ error: 'Agendamento sem tenant_id.' }, 400)
+      }
+
+      if (appointment.status !== 'pending_payment') {
+        console.warn(
+          '[stripe-create-checkout] public_booking appointment não está em pending_payment:',
+          appointment.status,
+        )
+      }
+
+      const connectAccount = await getConnectAccount(supabase, tenantId)
+
+      const params = new URLSearchParams()
+      params.append('mode', 'payment')
+
+      // Line item 0 — serviço do agendamento.
+      let itemIdx = 0
+      if (serviceAmountCents > 0) {
+        params.append(`line_items[${itemIdx}][quantity]`, '1')
+        params.append(`line_items[${itemIdx}][price_data][currency]`, 'brl')
+        params.append(
+          `line_items[${itemIdx}][price_data][product_data][name]`,
+          `Agendamento - ${customerName || 'Cliente'}`,
+        )
+        params.append(`line_items[${itemIdx}][price_data][unit_amount]`, String(serviceAmountCents))
+        itemIdx += 1
+      }
+
+      // Demais line items — produtos do carrinho.
+      for (const item of cartItems) {
+        const qty = Math.max(1, Number(item.quantity) || 1)
+        const unit = Math.max(0, Number(item.price_cents) || 0)
+        if (unit <= 0) continue
+        params.append(`line_items[${itemIdx}][quantity]`, String(qty))
+        params.append(`line_items[${itemIdx}][price_data][currency]`, 'brl')
+        const safeName = String(item.name || 'Produto').slice(0, 200)
+        params.append(`line_items[${itemIdx}][price_data][product_data][name]`, safeName)
+        params.append(`line_items[${itemIdx}][price_data][unit_amount]`, String(unit))
+        itemIdx += 1
+      }
+
+      params.append('success_url', successUrl)
+      params.append('cancel_url', cancelUrl)
+
+      // metadata — o webhook usa isso para registrar product_sales.
+      const productIds = Array.isArray(body.product_ids) ? body.product_ids.join(',') : ''
+      params.append('metadata[appointment_id]', appointmentId)
+      params.append('metadata[tenant_id]', tenantId)
+      params.append('metadata[customer_name]', customerName)
+      params.append('metadata[scenario]', 'public_booking')
+      params.append('metadata[source]', 'public_booking')
+      if (productIds) params.append('metadata[product_ids]', productIds)
+
+      if (customerEmail) {
+        params.append('customer_email', customerEmail)
+      }
+
+      // Stripe Connect: 2% de comissão sobre o total, repassado à conta do tenant.
+      if (connectAccount?.stripe_account_id) {
+        const totalCents =
+          serviceAmountCents +
+          cartItems.reduce(
+            (acc, it) =>
+              acc + Math.max(1, Number(it.quantity) || 1) * Math.max(0, Number(it.price_cents) || 0),
+            0,
+          )
+        const feeAmount = Math.round(totalCents * 0.02)
+        params.append('payment_intent_data[application_fee_amount]', String(feeAmount))
+        params.append(
+          'payment_intent_data[transfer_data][destination]',
+          connectAccount.stripe_account_id,
+        )
+        params.append('metadata[connect_account_id]', connectAccount.stripe_account_id)
+      }
+
+      const resp = await stripePost('/checkout/sessions', stripeSecretKey, params)
+      if (!resp.ok) {
+        console.error('[stripe-create-checkout] public_booking checkout error:', resp.data)
+        return json(
+          { error: 'Erro ao criar checkout de agendamento + produtos.', details: resp.data },
+          502,
+        )
+      }
+      return json({ url: resp.data.url, session_id: resp.data.id })
+    }
+
+    // =====================================================================
     // CENÁRIO 2 — Agendamento: cliente final pagando por um agendamento
     // =====================================================================
     if (scenario === 'appointment' || body.appointment_id) {

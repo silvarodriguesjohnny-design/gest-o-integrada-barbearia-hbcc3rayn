@@ -456,6 +456,68 @@ Deno.serve(async (req: Request) => {
       })
     }
 
+    if (action === 'finalize_products_booking') {
+      // Fluxo de carrinho pós-agendamento — "Pagar na barbearia".
+      // Confirma o agendamento (pending_payment -> scheduled), registra as
+      // vendas de produtos in_person e dispara a notificação de confirmação.
+      const { appointment_id, tenant_id, items } = body as {
+        appointment_id: string
+        tenant_id: string
+        items: { product_id: string; quantity: number; unit_price: number }[]
+      }
+      if (!appointment_id || !tenant_id) {
+        return new Response(JSON.stringify({ error: 'appointment_id e tenant_id obrigatórios.' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      // Confirma o agendamento para 'scheduled' (se ainda pending_payment).
+      const { data: appt } = await supabase
+        .from('appointments')
+        .select('id, status, tenant_id')
+        .eq('id', appointment_id)
+        .maybeSingle()
+      if (appt && appt.status === 'pending_payment') {
+        await supabase.from('appointments').update({ status: 'scheduled' }).eq('id', appointment_id)
+        // Dispara a notificação de confirmação (igual ao fluxo normal).
+        try {
+          const fnUrl = `${supabaseUrl}/functions/v1/send-appointment-notification`
+          await fetch(fnUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${supabaseServiceKey}`,
+            },
+            body: JSON.stringify({ appointment_id, type: 'confirmation' }),
+          })
+        } catch (notifyErr) {
+          console.error(
+            '[public-booking] finalize_products_booking notification error:',
+            String(notifyErr),
+          )
+        }
+      }
+
+      // Registra as vendas de produtos (in_person).
+      if (Array.isArray(items) && items.length > 0) {
+        const rows = items.map((it) => ({
+          appointment_id,
+          tenant_id,
+          product_id: it.product_id,
+          quantity: Number(it.quantity) || 1,
+          unit_price: Number(it.unit_price) || 0,
+          total: (Number(it.quantity) || 1) * (Number(it.unit_price) || 0),
+          payment_method: 'in_person',
+        }))
+        await supabase.from('product_sales').insert(rows)
+      }
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
     return new Response(JSON.stringify({ error: 'Invalid action' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

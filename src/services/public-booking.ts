@@ -143,11 +143,28 @@ export async function createBooking(data: {
   barber_name?: string | null
   date: string
   time: string
+  require_prepayment?: boolean
 }) {
   const { data: result, error } = await supabase.functions.invoke('public-booking', {
     body: { action: 'create_booking', ...data },
   })
   return { data: result, error }
+}
+
+/**
+ * Finaliza o fluxo de carrinho pós-agendamento pelo caminho "Pagar na
+ * barbearia" (sem pagamento online). Confirma o agendamento (pending_payment
+ * -> scheduled) e registra as vendas de produtos como in_person.
+ */
+export async function finalizeProductsBooking(data: {
+  appointment_id: string
+  tenant_id: string
+  items: { product_id: string; quantity: number; unit_price: number }[]
+}): Promise<{ data: { success: boolean } | null; error: any }> {
+  const { data: result, error } = await supabase.functions.invoke('public-booking', {
+    body: { action: 'finalize_products_booking', ...data },
+  })
+  return { data: result as { success: boolean } | null, error }
 }
 
 export interface AppointmentConfirmationData {
