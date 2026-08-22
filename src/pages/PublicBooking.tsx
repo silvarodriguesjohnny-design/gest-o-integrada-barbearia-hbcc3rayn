@@ -39,12 +39,15 @@ import {
   fetchMonthRawData,
   getPublicSubscriptionPlans,
   startPublicSubscriptionCheckout,
+  consumeSubscriptionSession,
   type PublicService,
   type PublicCustomer,
+  type PublicActiveSubscription,
   type PublicBarberSchedule,
   type SlotAppointment,
   type MonthSlotData,
 } from '@/services/public-booking'
+import { startAppointmentCheckout } from '@/services/stripe-checkout'
 import { formatLocalDateYYYYMMDD } from '@/lib/date-utils'
 import { cn } from '@/lib/utils'
 import { manifestUrl } from '@/services/totem-pwa'
@@ -105,6 +108,10 @@ export default function PublicBooking() {
   const [stripeEnabled, setStripeEnabled] = useState(false)
   const [prepaymentEnabled, setPrepaymentEnabled] = useState(false)
   const [prepaidPlan, setPrepaidPlan] = useState<SubscriptionPlan | null>(null)
+  // --- Créditos de assinatura ativa do cliente (identificação por CPF) ---
+  const [activeSubscription, setActiveSubscription] = useState<PublicActiveSubscription | null>(
+    null,
+  )
 
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [rawMonthData, setRawMonthData] = useState<Map<string, MonthSlotData>>(new Map())
@@ -255,13 +262,112 @@ export default function PublicBooking() {
     })
   }, [resolvedTenantId, stripeEnabled])
 
-  const handleBook = async (opts?: { prepay?: boolean }) => {
+  const handleBook = async (opts?: { prepay?: boolean; useCredit?: boolean }) => {
     if (!resolvedTenantId || !selectedService || !selectedSlot || !customer) return
     setBooking(true)
 
-    // Se o cliente escolheu pagar agora, iniciamos o checkout do plano pré-pago
-    // ANTES de criar o agendamento. Ao retornar do Stripe, o agendamento será
-    // criado pelo fluxo normal (ou pelo webhook, conforme implementação futura).
+    // === Caminho A: usar crédito de assinatura ativa (sem pagamento) ===
+    // O cliente tem assinatura ativa com sessões restantes e escolheu usar crédito.
+    if (opts?.useCredit && activeSubscription && activeSubscription.sessions_remaining > 0) {
+      // 1. Cria o agendamento (sem pagamento antecipado).
+      const { error } = await createBooking({
+        tenant_id: resolvedTenantId,
+        service_id: selectedService.id,
+        customer_id: customer.id,
+        barber_name: selectedBarber,
+        date,
+        time: selectedSlot,
+      })
+      if (error) {
+        setBooking(false)
+        toast({
+          title: 'Erro no agendamento',
+          description: error.message || 'Este horário não está mais disponível.',
+          variant: 'destructive',
+        })
+        return
+      }
+      // 2. Consome o crédito (atomicamente, via RPC FOR UPDATE). Buscamos o
+      //    agendamento recém-criado por customer+start_time para amarrar a auditoria.
+      //    O consume_subscription_session aceita appointment_id opcional.
+      const { error: consumeErr } = await consumeSubscriptionSession(resolvedTenantId, customer.id)
+      setBooking(false)
+      if (consumeErr) {
+        toast({
+          title: 'Não foi possível usar o crédito',
+          description:
+            'Seu agendamento foi criado, mas houve um problema ao consumir o crédito. Fale com a barbearia.',
+          variant: 'destructive',
+        })
+      } else {
+        // Atualiza o estado local de créditos restantes.
+        setActiveSubscription((prev) =>
+          prev
+            ? {
+                ...prev,
+                sessions_used: prev.sessions_used + 1,
+                sessions_remaining: Math.max(0, prev.sessions_remaining - 1),
+              }
+            : prev,
+        )
+      }
+      setDone(true)
+      toast({ title: 'Agendamento confirmado com crédito! 🎉' })
+      return
+    }
+
+    // === Caminho B: pagamento antecipado do agendamento (Cenário 2) ===
+    // O agendamento é salvo ANTES com status 'pending_payment' para reservar o
+    // horário; depois redirecionamos ao Stripe. O webhook confirma para
+    // 'scheduled' após o pagamento.
+    if (opts?.prepay && prepaymentEnabled && stripeEnabled) {
+      // 1. Cria o agendamento em 'pending_payment' para reservar o horário.
+      const { data: bookingData, error: bookingError } = await createBooking({
+        tenant_id: resolvedTenantId,
+        service_id: selectedService.id,
+        customer_id: customer.id,
+        barber_name: selectedBarber,
+        date,
+        time: selectedSlot,
+        require_prepayment: true,
+      })
+      if (bookingError || !bookingData?.appointment) {
+        setBooking(false)
+        toast({
+          title: 'Erro no agendamento',
+          description: bookingError?.message || 'Este horário não está mais disponível.',
+          variant: 'destructive',
+        })
+        return
+      }
+      const appointment = bookingData.appointment
+      // 2. Inicia o checkout do agendamento (2% de comissão, fallback plataforma).
+      const amountCents = Math.round(Number(selectedService.price) * 100)
+      const successUrl = `${window.location.origin}/agendar/${tenant?.slug || resolvedTenantId}?paid=1&appt=${appointment.id}`
+      const cancelUrl = `${window.location.origin}/agendar/${tenant?.slug || resolvedTenantId}`
+      const { data: checkoutData, error: checkoutError } = await startAppointmentCheckout({
+        appointment_id: appointment.id,
+        amount: amountCents,
+        customer_name: customer.name,
+        customer_email: customer.email || undefined,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+      })
+      setBooking(false)
+      if (checkoutError || !checkoutData?.url) {
+        toast({
+          title: 'Erro no pagamento',
+          description: checkoutError?.message || 'Não foi possível iniciar o pagamento.',
+          variant: 'destructive',
+        })
+        // O agendamento ficou em pending_payment; o cliente pode tentar de novo.
+        return
+      }
+      window.location.href = checkoutData.url
+      return
+    }
+
+    // === Caminho C (legado): assinatura pré-paga de plano ===
     if (opts?.prepay && prepaidPlan) {
       const successUrl = `${window.location.origin}/agendar/${tenant?.slug || resolvedTenantId}?paid=1`
       const cancelUrl = `${window.location.origin}/agendar/${tenant?.slug || resolvedTenantId}`
@@ -281,12 +387,11 @@ export default function PublicBooking() {
         })
         return
       }
-      // Redireciona para o Stripe Checkout — o agendamento será confirmado após retorno.
       window.location.href = checkoutData.checkout_url
       return
     }
 
-    // Fluxo normal: cria o agendamento sem pagamento antecipado.
+    // === Caminho D: fluxo normal sem pagamento ===
     const { error } = await createBooking({
       tenant_id: resolvedTenantId,
       service_id: selectedService.id,
@@ -305,7 +410,6 @@ export default function PublicBooking() {
     } else {
       setDone(true)
       toast({ title: 'Agendamento confirmado!' })
-      // Carrega planos de assinatura disponíveis para upsell
       if (resolvedTenantId) {
         getPublicSubscriptionPlans(resolvedTenantId).then(({ data }) => {
           if (data && data.length > 0) setPlans(data)
@@ -613,7 +717,11 @@ export default function PublicBooking() {
       <main className="mx-auto max-w-2xl px-4 md:px-6 py-6 md:py-8 space-y-6 md:space-y-8">
         {!customer ? (
           <div className="animate-fade-in-up">
-            <ClientIdentification tenantId={resolvedTenantId!} onIdentified={setCustomer} />
+            <ClientIdentification
+              tenantId={resolvedTenantId!}
+              onIdentified={setCustomer}
+              onSubscriptionFound={setActiveSubscription}
+            />
           </div>
         ) : !selectedService ? (
           <div className="space-y-6 md:space-y-8 animate-fade-in-up">
@@ -625,6 +733,14 @@ export default function PublicBooking() {
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-muted-foreground">Bem-vindo</p>
                 <p className="font-semibold truncate">{customer.name}</p>
+                {activeSubscription && activeSubscription.sessions_remaining > 0 && (
+                  <p className="text-xs text-accent font-medium mt-0.5">
+                    {activeSubscription.sessions_remaining} agendamento
+                    {activeSubscription.sessions_remaining === 1 ? '' : 's'} restante
+                    {activeSubscription.sessions_remaining === 1 ? '' : 's'} este mês
+                    {activeSubscription.plan_name ? ` · ${activeSubscription.plan_name}` : ''}
+                  </p>
+                )}
               </div>
               <Button
                 variant="ghost"
@@ -634,6 +750,7 @@ export default function PublicBooking() {
                   setCustomer(null)
                   setSelectedService(null)
                   setSelectedSlot('')
+                  setActiveSubscription(null)
                 }}
               >
                 Trocar
@@ -908,6 +1025,31 @@ export default function PublicBooking() {
                       </span>
                     </div>
                   </div>
+
+                  {/* Botão de crédito de assinatura ativa (se houver sessões restantes) */}
+                  {activeSubscription && activeSubscription.sessions_remaining > 0 && (
+                    <div className="space-y-2 rounded-lg border border-accent/40 bg-accent/5 p-3">
+                      <div className="flex items-center gap-2 text-sm md:text-base">
+                        <Sparkles className="h-4 w-4 md:h-5 w-5 text-accent" />
+                        <span className="font-semibold">Você tem créditos de assinatura</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        Restam <strong>{activeSubscription.sessions_remaining}</strong> agendamento
+                        {activeSubscription.sessions_remaining === 1 ? '' : 's'} no seu plano
+                        {activeSubscription.plan_name ? ` "${activeSubscription.plan_name}"` : ''}.
+                        Use um crédito agora e agende sem pagamento.
+                      </p>
+                      <Button
+                        variant="amber"
+                        size="lg"
+                        loading={booking}
+                        className="w-full min-h-[56px] touch-manipulation shadow-lg"
+                        onClick={() => handleBook({ useCredit: true })}
+                      >
+                        {booking ? 'Confirmando…' : `Usar crédito e Agendar para ${selectedSlot}`}
+                      </Button>
+                    </div>
+                  )}
 
                   {/* Opção de pagamento antecipado com desconto (apenas se Stripe configurado
                       pelo admin, o barbeiro ativou o toggle de prepayment e houver plano

@@ -53,7 +53,7 @@ export function Pricing() {
             Escolha seu plano
           </h2>
           <p className="mt-3 text-muted-foreground text-lg">
-            Comece hoje com 30 dias grátis. Sem cartão de crédito. Cancele quando quiser.
+            Comece hoje com 30 dias grátis. Nada é cobrado hoje. Cancele quando quiser.
           </p>
         </div>
         <div className="grid gap-6 md:grid-cols-3">

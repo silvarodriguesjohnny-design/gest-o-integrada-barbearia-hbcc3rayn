@@ -38,6 +38,13 @@ async function verifyStripeSignature(payload: string, signature: string, secret:
   return diff === 0
 }
 
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  })
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -49,10 +56,7 @@ Deno.serve(async (req: Request) => {
     const { secretKey: stripeSecretKey, webhookSecret } = await getStripeSecrets()
 
     if (!stripeSecretKey || !webhookSecret) {
-      return new Response(JSON.stringify({ error: 'Stripe webhook não configurado.' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return json({ error: 'Stripe webhook não configurado.' }, 500)
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
@@ -62,10 +66,7 @@ Deno.serve(async (req: Request) => {
     const isValid = await verifyStripeSignature(payload, signature, webhookSecret)
     if (!isValid) {
       console.error('[stripe-webhook] Invalid signature')
-      return new Response(JSON.stringify({ error: 'Assinatura inválida' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return json({ error: 'Assinatura inválida' }, 400)
     }
 
     const event = JSON.parse(payload)
@@ -81,104 +82,286 @@ Deno.serve(async (req: Request) => {
       console.error('[stripe-webhook] Error logging event:', String(logErr))
     }
 
-    const stripeApiBase = 'https://api.stripe.com/v1'
-
+    // =========================================================================
+    // checkout.session.completed — 3 cenários (SaaS, Agendamento, Assinatura)
+    // =========================================================================
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object
-      const planId = session.metadata?.plan_id
-      const clientId = session.metadata?.client_id
+      const scenario = session.metadata?.scenario || ''
       const tenantId = session.metadata?.tenant_id
-      const paymentType = session.metadata?.payment_type || 'monthly'
+      const planId = session.metadata?.plan_id
+      const clientId = session.metadata?.client_id || session.metadata?.customer_id
+      const appointmentId = session.metadata?.appointment_id
+      const customerName = session.metadata?.customer_name
 
-      if (!planId || !clientId || !tenantId) {
-        console.error('[stripe-webhook] Missing metadata in session', session.id)
-        return new Response(JSON.stringify({ error: 'Metadata ausente' }), {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
+      // -------------------------------------------------------------------
+      // CENÁRIO 1 — SaaS: barbearia assinando a plataforma (trial 30 dias)
+      // -------------------------------------------------------------------
+      if (scenario === 'saas') {
+        if (tenantId) {
+          // Atualiza o tenant: assinatura ativa, trial zerado (já cobriu cartão).
+          await supabase
+            .from('tenants')
+            .update({
+              subscription_status: 'active',
+              subscription_type: 'active',
+              trial_ends_at: null,
+              stripe_customer_id: session.customer || null,
+            })
+            .eq('id', tenantId)
+        }
+
+        // Registra em subscription_invoices (SaaS).
+        try {
+          await supabase.from('subscription_invoices').insert({
+            subscription_id: null,
+            stripe_invoice_id: session.id,
+            amount: Number(session.amount_total || 0) / 100,
+            status: 'paid',
+            paid_at: new Date().toISOString(),
+          })
+        } catch (invErr) {
+          console.error('[stripe-webhook] SaaS invoice insert error:', String(invErr))
+        }
       }
 
-      const { data: plan } = await supabase
-        .from('subscription_plans')
-        .select('id, name, price, prepaid_months, prepaid_discount_pct, prepaid_price')
-        .eq('id', planId)
-        .single()
+      // -------------------------------------------------------------------
+      // CENÁRIO 2 — Agendamento: cliente final pagou por um agendamento
+      // -------------------------------------------------------------------
+      else if (scenario === 'appointment' && appointmentId) {
+        // Atualiza appointment status para 'scheduled'
+        await supabase.from('appointments').update({ status: 'scheduled' }).eq('id', appointmentId)
 
-      const price = Number(plan?.price) || 0
-      const months = Number(plan?.prepaid_months) || 0
-      const discountPct = Number(plan?.prepaid_discount_pct) || 0
-      const prepaidPrice = Number(plan?.prepaid_price) || 0
-
-      const startDate = new Date()
-      const endDate = new Date(startDate)
-      if (paymentType === 'prepaid' && months > 0) {
-        endDate.setMonth(endDate.getMonth() + months)
-      } else {
-        endDate.setMonth(endDate.getMonth() + 1)
+        // REGRA: registra a comissão da plataforma (2%) em platform_earnings.
+        const amountTotal = Number(session.amount_total || 0)
+        const commission = Math.round(amountTotal * 0.02) / 100 // 2% em reais
+        try {
+          await supabase.from('platform_earnings').insert({
+            tenant_id: tenantId || null,
+            amount: commission,
+            fee_percent: 2.0,
+            source_type: 'appointment',
+            source_id: appointmentId,
+            stripe_charge_id: session.payment_intent || null,
+            status: session.metadata?.connect_account_id ? 'transferred' : 'pending',
+          })
+        } catch (earnErr) {
+          console.error('[stripe-webhook] platform_earnings insert error:', String(earnErr))
+        }
       }
 
-      const amountPaid =
-        paymentType === 'prepaid' && months > 0
-          ? prepaidPrice || price * months * (1 - discountPct / 100)
-          : price
+      // -------------------------------------------------------------------
+      // CENÁRIO 3 — Assinatura: cliente final assinando plano recorrente
+      // -------------------------------------------------------------------
+      else if (scenario === 'subscription_client' && clientId && tenantId) {
+        const stripeSubscriptionId = session.subscription
+        // Busca o plano para sessions_limit
+        const { data: plan } = await supabase
+          .from('subscription_plans')
+          .select('id, name, monthly_price, sessions_limit')
+          .eq('id', planId)
+          .maybeSingle()
 
-      const { error: insertError } = await supabase.from('subscriptions').insert({
-        client_id: clientId,
-        tenant_id: tenantId,
-        plan_id: planId,
-        stripe_subscription_id: session.subscription || session.id,
-        stripe_customer_id: session.customer,
-        status: 'active',
-        payment_type: paymentType,
-        start_date: startDate.toISOString().slice(0, 10),
-        end_date: endDate.toISOString().slice(0, 10),
-        amount_paid: amountPaid,
-      })
+        const sessionsLimit = Number(plan?.sessions_limit) || 4
 
-      if (insertError) {
-        console.error('[stripe-webhook] Error inserting subscription:', insertError)
-      }
+        // Cria/atualiza customer_subscriptions
+        const { data: existingSub } = await supabase
+          .from('customer_subscriptions')
+          .select('id')
+          .eq('customer_id', clientId)
+          .eq('tenant_id', tenantId)
+          .eq('stripe_subscription_id', stripeSubscriptionId)
+          .maybeSingle()
 
-      // Create invoice record
-      if (session.id) {
-        await supabase.from('subscription_invoices').insert({
-          subscription_id: null,
-          stripe_invoice_id: session.id,
-          amount: amountPaid,
-          status: 'paid',
-          paid_at: new Date().toISOString(),
-        })
-      }
-
-      // Notify via WhatsApp if possible
-      try {
-        const { data: client } = await supabase
-          .from('customers')
-          .select('name, phone, tenant_id')
-          .eq('id', clientId)
-          .single()
-        if (client?.phone) {
-          const msg = `Olá ${client.name}! 🎉 Sua assinatura do plano "${plan?.name || ''}" está ativa. Aproveite seus benefícios na barbearia!`
-          await fetch(`${supabaseUrl}/functions/v1/send-manual-message`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${supabaseServiceKey}`,
-            },
-            body: JSON.stringify({
-              tenant_id: client.tenant_id,
-              phone: client.phone,
-              message: msg,
-            }),
+        if (existingSub) {
+          await supabase
+            .from('customer_subscriptions')
+            .update({
+              status: 'active',
+              sessions_used: 0,
+              sessions_limit: sessionsLimit,
+              plan_id: planId,
+              current_period_start: new Date().toISOString(),
+              current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            })
+            .eq('id', existingSub.id)
+        } else {
+          await supabase.from('customer_subscriptions').insert({
+            customer_id: clientId,
+            tenant_id: tenantId,
+            plan_id: planId,
+            stripe_subscription_id: stripeSubscriptionId,
+            status: 'active',
+            sessions_used: 0,
+            sessions_limit: sessionsLimit,
+            current_period_start: new Date().toISOString(),
+            current_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
           })
         }
-      } catch (e) {
-        console.error('[stripe-webhook] WhatsApp notify error:', String(e))
+
+        // Notifica cliente por WhatsApp se possível.
+        try {
+          const { data: client } = await supabase
+            .from('customers')
+            .select('name, phone, tenant_id')
+            .eq('id', clientId)
+            .maybeSingle()
+          if (client?.phone) {
+            const msg = `Olá ${client.name}! 🎉 Sua assinatura do plano "${plan?.name || ''}" está ativa. Aproveite seus ${sessionsLimit} créditos de agendamento!`
+            await fetch(`${supabaseUrl}/functions/v1/send-manual-message`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${supabaseServiceKey}`,
+              },
+              body: JSON.stringify({
+                tenant_id: client.tenant_id,
+                phone: client.phone,
+                message: msg,
+              }),
+            })
+          }
+        } catch (e) {
+          console.error('[stripe-webhook] WhatsApp notify error:', String(e))
+        }
       }
-    } else if (event.type === 'invoice.payment_succeeded') {
+
+      // -------------------------------------------------------------------
+      // Fluxo legado (sem scenario explícito — compatibilidade com checkout
+      // antigo de assinatura de cliente via plano).
+      // -------------------------------------------------------------------
+      else if (planId && clientId && tenantId) {
+        const { data: plan } = await supabase
+          .from('subscription_plans')
+          .select(
+            'id, name, price, prepaid_months, prepaid_discount_pct, prepaid_price, sessions_limit',
+          )
+          .eq('id', planId)
+          .maybeSingle()
+
+        const price = Number(plan?.price) || 0
+        const months = Number(plan?.prepaid_months) || 0
+        const discountPct = Number(plan?.prepaid_discount_pct) || 0
+        const prepaidPrice = Number(plan?.prepaid_price) || 0
+        const sessionsLimit = Number(plan?.sessions_limit) || 4
+        const paymentType = session.metadata?.payment_type || 'monthly'
+
+        const startDate = new Date()
+        const endDate = new Date(startDate)
+        if (paymentType === 'prepaid' && months > 0) {
+          endDate.setMonth(endDate.getMonth() + months)
+        } else {
+          endDate.setMonth(endDate.getMonth() + 1)
+        }
+
+        const amountPaid =
+          paymentType === 'prepaid' && months > 0
+            ? prepaidPrice || price * months * (1 - discountPct / 100)
+            : price
+
+        const { error: insertError } = await supabase.from('subscriptions').insert({
+          client_id: clientId,
+          tenant_id: tenantId,
+          plan_id: planId,
+          stripe_subscription_id: session.subscription || session.id,
+          stripe_customer_id: session.customer,
+          status: 'active',
+          payment_type: paymentType,
+          start_date: startDate.toISOString().slice(0, 10),
+          end_date: endDate.toISOString().slice(0, 10),
+          amount_paid: amountPaid,
+        })
+
+        if (insertError) {
+          console.error('[stripe-webhook] Error inserting subscription:', insertError)
+        }
+
+        // Cria/reativa customer_subscriptions (créditos de agendamento)
+        const { data: existingSub } = await supabase
+          .from('customer_subscriptions')
+          .select('id')
+          .eq('customer_id', clientId)
+          .eq('tenant_id', tenantId)
+          .eq('stripe_subscription_id', session.subscription || session.id)
+          .maybeSingle()
+
+        if (existingSub) {
+          await supabase
+            .from('customer_subscriptions')
+            .update({
+              status: 'active',
+              sessions_used: 0,
+              sessions_limit: sessionsLimit,
+              plan_id: planId,
+              current_period_start: startDate.toISOString(),
+              current_period_end: endDate.toISOString(),
+            })
+            .eq('id', existingSub.id)
+        } else {
+          await supabase.from('customer_subscriptions').insert({
+            customer_id: clientId,
+            tenant_id: tenantId,
+            plan_id: planId,
+            stripe_subscription_id: session.subscription || session.id,
+            status: 'active',
+            sessions_used: 0,
+            sessions_limit: sessionsLimit,
+            current_period_start: startDate.toISOString(),
+            current_period_end: endDate.toISOString(),
+          })
+        }
+
+        if (session.id) {
+          await supabase.from('subscription_invoices').insert({
+            subscription_id: null,
+            stripe_invoice_id: session.id,
+            amount: amountPaid,
+            status: 'paid',
+            paid_at: new Date().toISOString(),
+          })
+        }
+      }
+    }
+
+    // =========================================================================
+    // invoice.payment_succeeded
+    //   - billing_reason = 'subscription_cycle' (renovação mensal): ZERAR
+    //     sessions_used na customer_subscriptions (REGRA #4). Sem isso o cliente
+    //     paga o segundo mês e não consegue agendar.
+    //   - billing_reason = 'subscription_create': manter sessions_used = 0.
+    // =========================================================================
+    else if (event.type === 'invoice.payment_succeeded') {
       const invoice = event.data.object
       const subscriptionId = invoice.subscription
-      // Find local subscription by stripe_subscription_id and extend end_date (monthly renewal)
+      const billingReason = invoice.billing_reason
+
+      // Zera sessions_used na renovação de ciclo.
+      if (subscriptionId && billingReason === 'subscription_cycle') {
+        const { data: custSub } = await supabase
+          .from('customer_subscriptions')
+          .select('id, customer_id, tenant_id')
+          .eq('stripe_subscription_id', subscriptionId)
+          .maybeSingle()
+
+        if (custSub) {
+          await supabase
+            .from('customer_subscriptions')
+            .update({
+              sessions_used: 0,
+              status: 'active',
+              current_period_start: invoice.period_start
+                ? new Date(invoice.period_start * 1000).toISOString()
+                : new Date().toISOString(),
+              current_period_end: invoice.period_end
+                ? new Date(invoice.period_end * 1000).toISOString()
+                : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+            })
+            .eq('id', custSub.id)
+          console.log('[stripe-webhook] sessions_used zerado (renovação):', subscriptionId)
+        }
+      }
+
+      // Legado: atualiza subscriptions (end_date + invoice).
       const { data: sub } = await supabase
         .from('subscriptions')
         .select('id, end_date, payment_type')
@@ -201,9 +384,23 @@ Deno.serve(async (req: Request) => {
           paid_at: new Date().toISOString(),
         })
       }
-    } else if (event.type === 'invoice.payment_failed') {
+    }
+
+    // =========================================================================
+    // invoice.payment_failed — marca customer_subscriptions como 'past_due'
+    // =========================================================================
+    else if (event.type === 'invoice.payment_failed') {
       const invoice = event.data.object
       const subscriptionId = invoice.subscription
+
+      if (subscriptionId) {
+        await supabase
+          .from('customer_subscriptions')
+          .update({ status: 'past_due' })
+          .eq('stripe_subscription_id', subscriptionId)
+      }
+
+      // Legado: subscriptions
       const { data: sub } = await supabase
         .from('subscriptions')
         .select('id')
@@ -218,8 +415,21 @@ Deno.serve(async (req: Request) => {
           status: 'failed',
         })
       }
-    } else if (event.type === 'customer.subscription.deleted') {
+    }
+
+    // =========================================================================
+    // customer.subscription.deleted — marca customer_subscriptions como
+    // 'cancelled'
+    // =========================================================================
+    else if (event.type === 'customer.subscription.deleted') {
       const subscription = event.data.object
+
+      await supabase
+        .from('customer_subscriptions')
+        .update({ status: 'cancelled' })
+        .eq('stripe_subscription_id', subscription.id)
+
+      // Legado: subscriptions
       const { data: sub } = await supabase
         .from('subscriptions')
         .select('id')
@@ -228,18 +438,43 @@ Deno.serve(async (req: Request) => {
       if (sub) {
         await supabase.from('subscriptions').update({ status: 'cancelled' }).eq('id', sub.id)
       }
-    } else {
-      console.log('[stripe-webhook] Unhandled event type:', event.type)
     }
 
-    return new Response(JSON.stringify({ received: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    // =========================================================================
+    // account.updated (Stripe Connect) — atualiza charges_enabled etc.
+    // =========================================================================
+    else if (event.type === 'account.updated') {
+      const account = event.data.object
+      const accountId = account.id
+
+      await supabase
+        .from('stripe_connect_accounts')
+        .update({
+          charges_enabled: !!account.charges_enabled,
+          payouts_enabled: !!account.payouts_enabled,
+          details_submitted: !!account.details_submitted,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('stripe_account_id', accountId)
+
+      // Sincroniza cache no tenant
+      const { data: connectRow } = await supabase
+        .from('stripe_connect_accounts')
+        .select('tenant_id, charges_enabled')
+        .eq('stripe_account_id', accountId)
+        .maybeSingle()
+
+      if (connectRow?.tenant_id) {
+        await supabase
+          .from('tenants')
+          .update({ stripe_connect_enabled: !!connectRow.charges_enabled })
+          .eq('id', connectRow.tenant_id)
+      }
+    }
+
+    return json({ received: true })
   } catch (err: any) {
     console.error('[stripe-webhook] error:', err)
-    return new Response(JSON.stringify({ error: err.message || 'Internal server error' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return json({ error: err.message || 'Internal server error' }, 500)
   }
 })

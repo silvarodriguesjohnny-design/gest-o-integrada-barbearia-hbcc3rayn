@@ -50,7 +50,7 @@ export default function Landing() {
             </Link>
             <Link to="/onboarding">
               <Button variant="amber" size="sm">
-                Teste Grátis
+                Teste Grátis &middot; 30 dias
               </Button>
             </Link>
           </div>

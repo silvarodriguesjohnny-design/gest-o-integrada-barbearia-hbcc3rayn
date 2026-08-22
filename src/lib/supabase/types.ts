@@ -1,17 +1,11 @@
 // AVOID UPDATING THIS FILE DIRECTLY. It is automatically generated.
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[]
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
 
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: '14.5'
   }
   public: {
     Tables: {
@@ -27,7 +21,7 @@ export type Database = {
           reminder_sent: boolean | null
           service_id: string
           start_time: string
-          status: Database["public"]["Enums"]["appointment_status"]
+          status: Database['public']['Enums']['appointment_status']
           tenant_id: string | null
         }
         Insert: {
@@ -41,7 +35,7 @@ export type Database = {
           reminder_sent?: boolean | null
           service_id: string
           start_time: string
-          status?: Database["public"]["Enums"]["appointment_status"]
+          status?: Database['public']['Enums']['appointment_status']
           tenant_id?: string | null
         }
         Update: {
@@ -55,39 +49,225 @@ export type Database = {
           reminder_sent?: boolean | null
           service_id?: string
           start_time?: string
-          status?: Database["public"]["Enums"]["appointment_status"]
+          status?: Database['public']['Enums']['appointment_status']
           tenant_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "appointments_barber_id_fkey"
-            columns: ["barber_id"]
+            foreignKeyName: 'appointments_barber_id_fkey'
+            columns: ['barber_id']
             isOneToOne: false
-            referencedRelation: "barbers"
-            referencedColumns: ["id"]
+            referencedRelation: 'barbers'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "appointments_customer_id_fkey"
-            columns: ["customer_id"]
+            foreignKeyName: 'appointments_customer_id_fkey'
+            columns: ['customer_id']
             isOneToOne: false
-            referencedRelation: "customers"
-            referencedColumns: ["id"]
+            referencedRelation: 'customers'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "appointments_service_id_fkey"
-            columns: ["service_id"]
+            foreignKeyName: 'appointments_service_id_fkey'
+            columns: ['service_id']
             isOneToOne: false
-            referencedRelation: "services"
-            referencedColumns: ["id"]
+            referencedRelation: 'services'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "appointments_tenant_id_fkey"
-            columns: ["tenant_id"]
+            foreignKeyName: 'appointments_tenant_id_fkey'
+            columns: ['tenant_id']
             isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
           },
         ]
+      }
+      customer_subscriptions: {
+        Row: {
+          created_at: string
+          customer_id: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          plan_id: string | null
+          sessions_limit: number
+          sessions_used: number
+          status: string
+          stripe_subscription_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_id?: string | null
+          sessions_limit?: number
+          sessions_used?: number
+          status?: string
+          stripe_subscription_id?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_id?: string | null
+          sessions_limit?: number
+          sessions_used?: number
+          status?: string
+          stripe_subscription_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'customer_subscriptions_customer_id_fkey'
+            columns: ['customer_id']
+            isOneToOne: false
+            referencedRelation: 'customers'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'customer_subscriptions_plan_id_fkey'
+            columns: ['plan_id']
+            isOneToOne: false
+            referencedRelation: 'subscription_plans'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'customer_subscriptions_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      subscription_usage: {
+        Row: {
+          appointment_id: string | null
+          created_at: string
+          customer_subscription_id: string
+          id: string
+          session_date: string
+        }
+        Insert: {
+          appointment_id?: string | null
+          created_at?: string
+          customer_subscription_id: string
+          id?: string
+          session_date?: string
+        }
+        Update: {
+          appointment_id?: string | null
+          created_at?: string
+          customer_subscription_id?: string
+          id?: string
+          session_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'subscription_usage_customer_subscription_id_fkey'
+            columns: ['customer_subscription_id']
+            isOneToOne: false
+            referencedRelation: 'customer_subscriptions'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'subscription_usage_appointment_id_fkey'
+            columns: ['appointment_id']
+            isOneToOne: false
+            referencedRelation: 'appointments'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      stripe_connect_accounts: {
+        Row: {
+          charges_enabled: boolean
+          created_at: string
+          details_submitted: boolean
+          id: string
+          payouts_enabled: boolean
+          stripe_account_id: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          charges_enabled?: boolean
+          created_at?: string
+          details_submitted?: boolean
+          id?: string
+          payouts_enabled?: boolean
+          stripe_account_id?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          charges_enabled?: boolean
+          created_at?: string
+          details_submitted?: boolean
+          id?: string
+          payouts_enabled?: boolean
+          stripe_account_id?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'stripe_connect_accounts_tenant_id_fkey'
+            columns: ['tenant_id']
+            isOneToOne: false
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      platform_earnings: {
+        Row: {
+          amount: number
+          created_at: string
+          fee_percent: number
+          id: string
+          source_id: string | null
+          source_type: string
+          status: string
+          stripe_charge_id: string | null
+          stripe_transfer_id: string | null
+          tenant_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          fee_percent?: number
+          id?: string
+          source_id?: string | null
+          source_type: string
+          status?: string
+          stripe_charge_id?: string | null
+          stripe_transfer_id?: string | null
+          tenant_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          fee_percent?: number
+          id?: string
+          source_id?: string | null
+          source_type?: string
+          status?: string
+          stripe_charge_id?: string | null
+          stripe_transfer_id?: string | null
+          tenant_id?: string | null
+        }
+        Relationships: []
       }
       barber_schedules: {
         Row: {
@@ -119,11 +299,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "barber_schedules_barber_id_fkey"
-            columns: ["barber_id"]
+            foreignKeyName: 'barber_schedules_barber_id_fkey'
+            columns: ['barber_id']
             isOneToOne: false
-            referencedRelation: "barbers"
-            referencedColumns: ["id"]
+            referencedRelation: 'barbers'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -235,11 +415,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "customers_tenant_id_fkey"
-            columns: ["tenant_id"]
+            foreignKeyName: 'customers_tenant_id_fkey'
+            columns: ['tenant_id']
             isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -310,7 +490,7 @@ export type Database = {
           email: string
           id: string
           invited_by: string | null
-          role: Database["public"]["Enums"]["user_role"]
+          role: Database['public']['Enums']['user_role']
           status: string
           tenant_id: string | null
         }
@@ -320,7 +500,7 @@ export type Database = {
           email: string
           id?: string
           invited_by?: string | null
-          role?: Database["public"]["Enums"]["user_role"]
+          role?: Database['public']['Enums']['user_role']
           status?: string
           tenant_id?: string | null
         }
@@ -330,7 +510,7 @@ export type Database = {
           email?: string
           id?: string
           invited_by?: string | null
-          role?: Database["public"]["Enums"]["user_role"]
+          role?: Database['public']['Enums']['user_role']
           status?: string
           tenant_id?: string | null
         }
@@ -363,11 +543,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "loyalty_cards_customer_id_fkey"
-            columns: ["customer_id"]
+            foreignKeyName: 'loyalty_cards_customer_id_fkey'
+            columns: ['customer_id']
             isOneToOne: true
-            referencedRelation: "customers"
-            referencedColumns: ["id"]
+            referencedRelation: 'customers'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -591,7 +771,7 @@ export type Database = {
           id: string
           is_super_admin: boolean
           phone: string | null
-          role: Database["public"]["Enums"]["user_role"]
+          role: Database['public']['Enums']['user_role']
           tenant_id: string | null
         }
         Insert: {
@@ -603,7 +783,7 @@ export type Database = {
           id: string
           is_super_admin?: boolean
           phone?: string | null
-          role?: Database["public"]["Enums"]["user_role"]
+          role?: Database['public']['Enums']['user_role']
           tenant_id?: string | null
         }
         Update: {
@@ -615,16 +795,16 @@ export type Database = {
           id?: string
           is_super_admin?: boolean
           phone?: string | null
-          role?: Database["public"]["Enums"]["user_role"]
+          role?: Database['public']['Enums']['user_role']
           tenant_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "profiles_tenant_id_fkey"
-            columns: ["tenant_id"]
+            foreignKeyName: 'profiles_tenant_id_fkey'
+            columns: ['tenant_id']
             isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -655,11 +835,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "services_tenant_id_fkey"
-            columns: ["tenant_id"]
+            foreignKeyName: 'services_tenant_id_fkey'
+            columns: ['tenant_id']
             isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -668,7 +848,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
-          movement_type: Database["public"]["Enums"]["stock_movement_type"]
+          movement_type: Database['public']['Enums']['stock_movement_type']
           product_id: string
           quantity: number
           reason: string
@@ -678,7 +858,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
-          movement_type: Database["public"]["Enums"]["stock_movement_type"]
+          movement_type: Database['public']['Enums']['stock_movement_type']
           product_id: string
           quantity: number
           reason?: string
@@ -688,7 +868,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
-          movement_type?: Database["public"]["Enums"]["stock_movement_type"]
+          movement_type?: Database['public']['Enums']['stock_movement_type']
           product_id?: string
           quantity?: number
           reason?: string
@@ -696,18 +876,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "stock_movements_product_id_fkey"
-            columns: ["product_id"]
+            foreignKeyName: 'stock_movements_product_id_fkey'
+            columns: ['product_id']
             isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
+            referencedRelation: 'products'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "stock_movements_tenant_id_fkey"
-            columns: ["tenant_id"]
+            foreignKeyName: 'stock_movements_tenant_id_fkey'
+            columns: ['tenant_id']
             isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -762,11 +942,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "subscription_invoices_subscription_id_fkey"
-            columns: ["subscription_id"]
+            foreignKeyName: 'subscription_invoices_subscription_id_fkey'
+            columns: ['subscription_id']
             isOneToOne: false
-            referencedRelation: "subscriptions"
-            referencedColumns: ["id"]
+            referencedRelation: 'subscriptions'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -782,6 +962,8 @@ export type Database = {
           prepaid_price: number
           price: number
           services_included: Json
+          sessions_limit: number
+          stripe_price_id: string | null
           tenant_id: string
           updated_at: string
         }
@@ -796,6 +978,8 @@ export type Database = {
           prepaid_price?: number
           price?: number
           services_included?: Json
+          sessions_limit?: number
+          stripe_price_id?: string | null
           tenant_id: string
           updated_at?: string
         }
@@ -810,16 +994,18 @@ export type Database = {
           prepaid_price?: number
           price?: number
           services_included?: Json
+          sessions_limit?: number
+          stripe_price_id?: string | null
           tenant_id?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "subscription_plans_tenant_id_fkey"
-            columns: ["tenant_id"]
+            foreignKeyName: 'subscription_plans_tenant_id_fkey'
+            columns: ['tenant_id']
             isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -871,25 +1057,25 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "subscriptions_client_id_fkey"
-            columns: ["client_id"]
+            foreignKeyName: 'subscriptions_client_id_fkey'
+            columns: ['client_id']
             isOneToOne: false
-            referencedRelation: "customers"
-            referencedColumns: ["id"]
+            referencedRelation: 'customers'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "subscriptions_plan_id_fkey"
-            columns: ["plan_id"]
+            foreignKeyName: 'subscriptions_plan_id_fkey'
+            columns: ['plan_id']
             isOneToOne: false
-            referencedRelation: "subscription_plans"
-            referencedColumns: ["id"]
+            referencedRelation: 'subscription_plans'
+            referencedColumns: ['id']
           },
           {
-            foreignKeyName: "subscriptions_tenant_id_fkey"
-            columns: ["tenant_id"]
+            foreignKeyName: 'subscriptions_tenant_id_fkey'
+            columns: ['tenant_id']
             isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -912,14 +1098,14 @@ export type Database = {
           numero_cadeiras: number | null
           owner_id: string | null
           phone: string | null
-          plan_type: Database["public"]["Enums"]["plan_type"]
+          plan_type: Database['public']['Enums']['plan_type']
           prepayment_enabled: boolean
           quantidade_profissionais: number | null
           rua: string | null
           slug: string
           status: string
           subscription_status: string
-          subscription_type: Database["public"]["Enums"]["subscription_type"]
+          subscription_type: Database['public']['Enums']['subscription_type']
           trial_ends_at: string | null
           whatsapp_phone: string | null
         }
@@ -941,14 +1127,14 @@ export type Database = {
           numero_cadeiras?: number | null
           owner_id?: string | null
           phone?: string | null
-          plan_type?: Database["public"]["Enums"]["plan_type"]
+          plan_type?: Database['public']['Enums']['plan_type']
           prepayment_enabled?: boolean
           quantidade_profissionais?: number | null
           rua?: string | null
           slug: string
           status?: string
           subscription_status?: string
-          subscription_type?: Database["public"]["Enums"]["subscription_type"]
+          subscription_type?: Database['public']['Enums']['subscription_type']
           trial_ends_at?: string | null
           whatsapp_phone?: string | null
         }
@@ -970,14 +1156,14 @@ export type Database = {
           numero_cadeiras?: number | null
           owner_id?: string | null
           phone?: string | null
-          plan_type?: Database["public"]["Enums"]["plan_type"]
+          plan_type?: Database['public']['Enums']['plan_type']
           prepayment_enabled?: boolean
           quantidade_profissionais?: number | null
           rua?: string | null
           slug?: string
           status?: string
           subscription_status?: string
-          subscription_type?: Database["public"]["Enums"]["subscription_type"]
+          subscription_type?: Database['public']['Enums']['subscription_type']
           trial_ends_at?: string | null
           whatsapp_phone?: string | null
         }
@@ -1022,11 +1208,11 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "totem_config_tenant_id_fkey"
-            columns: ["tenant_id"]
+            foreignKeyName: 'totem_config_tenant_id_fkey'
+            columns: ['tenant_id']
             isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
+            referencedRelation: 'tenants'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -1040,7 +1226,7 @@ export type Database = {
           id: string
           payment_method: string | null
           tenant_id: string | null
-          type: Database["public"]["Enums"]["transaction_type"]
+          type: Database['public']['Enums']['transaction_type']
         }
         Insert: {
           amount: number
@@ -1051,7 +1237,7 @@ export type Database = {
           id?: string
           payment_method?: string | null
           tenant_id?: string | null
-          type: Database["public"]["Enums"]["transaction_type"]
+          type: Database['public']['Enums']['transaction_type']
         }
         Update: {
           amount?: number
@@ -1062,15 +1248,15 @@ export type Database = {
           id?: string
           payment_method?: string | null
           tenant_id?: string | null
-          type?: Database["public"]["Enums"]["transaction_type"]
+          type?: Database['public']['Enums']['transaction_type']
         }
         Relationships: [
           {
-            foreignKeyName: "transactions_customer_id_fkey"
-            columns: ["customer_id"]
+            foreignKeyName: 'transactions_customer_id_fkey'
+            columns: ['customer_id']
             isOneToOne: false
-            referencedRelation: "customers"
-            referencedColumns: ["id"]
+            referencedRelation: 'customers'
+            referencedColumns: ['id']
           },
         ]
       }
@@ -1093,13 +1279,13 @@ export type Database = {
     Functions: {
       get_user_role: {
         Args: never
-        Returns: Database["public"]["Enums"]["user_role"]
+        Returns: Database['public']['Enums']['user_role']
       }
       get_user_tenant_id: { Args: never; Returns: string }
       is_super_admin: { Args: never; Returns: boolean }
       register_stock_movement: {
         Args: {
-          p_movement_type: Database["public"]["Enums"]["stock_movement_type"]
+          p_movement_type: Database['public']['Enums']['stock_movement_type']
           p_product_id: string
           p_quantity: number
           p_reason?: string
@@ -1108,15 +1294,15 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
-          movement_type: Database["public"]["Enums"]["stock_movement_type"]
+          movement_type: Database['public']['Enums']['stock_movement_type']
           product_id: string
           quantity: number
           reason: string
           tenant_id: string | null
         }
         SetofOptions: {
-          from: "*"
-          to: "stock_movements"
+          from: '*'
+          to: 'stock_movements'
           isOneToOne: true
           isSetofReturn: false
         }
@@ -1124,12 +1310,17 @@ export type Database = {
       trigger_send_notifications: { Args: never; Returns: undefined }
     }
     Enums: {
-      appointment_status: "scheduled" | "confirmed" | "completed" | "cancelled"
-      plan_type: "essential" | "pro" | "elite"
-      stock_movement_type: "entrada" | "saida"
-      subscription_type: "trial" | "active" | "past_due"
-      transaction_type: "income" | "expense"
-      user_role: "admin" | "operator" | "viewer"
+      appointment_status:
+        | 'scheduled'
+        | 'confirmed'
+        | 'completed'
+        | 'cancelled'
+        | 'pending_payment'
+      plan_type: 'essential' | 'pro' | 'elite'
+      stock_movement_type: 'entrada' | 'saida'
+      subscription_type: 'trial' | 'active' | 'past_due'
+      transaction_type: 'income' | 'expense'
+      user_role: 'admin' | 'operator' | 'viewer'
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1137,33 +1328,31 @@ export type Database = {
   }
 }
 
-type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+type DatabaseWithoutInternals = Omit<Database, '__InternalSupabase'>
 
-type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, 'public'>]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
-    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])[TableName] extends {
       Row: infer R
     }
     ? R
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])
-    ? (DefaultSchema["Tables"] &
-        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
+    ? (DefaultSchema['Tables'] & DefaultSchema['Views'])[DefaultSchemaTableNameOrOptions] extends {
         Row: infer R
       }
       ? R
@@ -1172,23 +1361,23 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
+    | keyof DefaultSchema['Tables']
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
       Insert: infer I
     }
     ? I
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
+    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
         Insert: infer I
       }
       ? I
@@ -1197,23 +1386,23 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    | keyof DefaultSchema["Tables"]
+    | keyof DefaultSchema['Tables']
     | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
     : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'][TableName] extends {
       Update: infer U
     }
     ? U
     : never
-  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
-    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema['Tables']
+    ? DefaultSchema['Tables'][DefaultSchemaTableNameOrOptions] extends {
         Update: infer U
       }
       ? U
@@ -1222,48 +1411,47 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
+    | keyof DefaultSchema['Enums']
     | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
     : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums'][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema['Enums']
+    ? DefaultSchema['Enums'][DefaultSchemaEnumNameOrOptions]
     : never
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
+    | keyof DefaultSchema['CompositeTypes']
     | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
-    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
     : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
-  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes'][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema['CompositeTypes']
+    ? DefaultSchema['CompositeTypes'][PublicCompositeTypeNameOrOptions]
     : never
 
 export const Constants = {
   public: {
     Enums: {
-      appointment_status: ["scheduled", "confirmed", "completed", "cancelled"],
-      plan_type: ["essential", "pro", "elite"],
-      stock_movement_type: ["entrada", "saida"],
-      subscription_type: ["trial", "active", "past_due"],
-      transaction_type: ["income", "expense"],
-      user_role: ["admin", "operator", "viewer"],
+      appointment_status: ['scheduled', 'confirmed', 'completed', 'cancelled', 'pending_payment'],
+      plan_type: ['essential', 'pro', 'elite'],
+      stock_movement_type: ['entrada', 'saida'],
+      subscription_type: ['trial', 'active', 'past_due'],
+      transaction_type: ['income', 'expense'],
+      user_role: ['admin', 'operator', 'viewer'],
     },
   },
 } as const
-

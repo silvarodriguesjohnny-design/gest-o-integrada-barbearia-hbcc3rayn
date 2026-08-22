@@ -29,6 +29,16 @@ export interface PublicCustomer {
   cpf: string | null
 }
 
+export interface PublicActiveSubscription {
+  id: string
+  status: string
+  sessions_used: number
+  sessions_limit: number
+  sessions_remaining: number
+  current_period_end: string | null
+  plan_name: string | null
+}
+
 export interface SlotAppointment {
   start_time: string
   end_time: string
@@ -70,11 +80,46 @@ export async function getSlots(tenantId: string, date: string) {
   }
 }
 
-export async function identifyCustomer(tenantId: string, cpf: string) {
+export async function identifyCustomer(
+  tenantId: string,
+  cpf: string,
+): Promise<{
+  data: {
+    customer: PublicCustomer | null
+    active_subscription: PublicActiveSubscription | null
+  } | null
+  error: any
+}> {
   const { data, error } = await supabase.functions.invoke('public-booking', {
     body: { action: 'identify_customer', tenant_id: tenantId, cpf },
   })
-  return { data: data as { customer: PublicCustomer | null } | null, error }
+  return {
+    data: data as {
+      customer: PublicCustomer | null
+      active_subscription: PublicActiveSubscription | null
+    } | null,
+    error,
+  }
+}
+
+/**
+ * Consome um crédito de assinatura ativa (atomicamente, via RPC FOR UPDATE).
+ * Retorna true se o crédito foi consumido com sucesso.
+ */
+export async function consumeSubscriptionSession(
+  tenantId: string,
+  customerId: string,
+  appointmentId?: string,
+): Promise<{ data: { success: boolean } | null; error: any }> {
+  const { data, error } = await supabase.functions.invoke('public-booking', {
+    body: {
+      action: 'consume_subscription_session',
+      tenant_id: tenantId,
+      customer_id: customerId,
+      appointment_id: appointmentId || null,
+    },
+  })
+  return { data: data as { success: boolean } | null, error }
 }
 
 export async function createPublicCustomer(data: {

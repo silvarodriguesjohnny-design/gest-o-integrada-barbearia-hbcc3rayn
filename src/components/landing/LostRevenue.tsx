@@ -200,7 +200,7 @@ export function LostRevenue() {
             </Button>
           </Link>
           <p className="mt-3 text-sm text-gray-400">
-            Comece seu teste grátis de 30 dias. Sem compromisso.
+            Comece seu teste grátis de 30 dias. Nada é cobrado hoje. Cancele quando quiser.
           </p>
         </div>
       </div>

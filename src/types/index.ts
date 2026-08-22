@@ -38,6 +38,9 @@ export interface Tenant {
   numero_cadeiras?: number | null
   quantidade_profissionais?: number | null
   prepayment_enabled?: boolean
+  stripe_connect_id?: string | null
+  stripe_connect_enabled?: boolean
+  stripe_customer_id?: string | null
 }
 
 export interface Customer {
@@ -93,7 +96,12 @@ export interface StockMovement {
   created_by_name?: string | null
 }
 
-export type AppointmentStatus = 'scheduled' | 'confirmed' | 'completed' | 'cancelled'
+export type AppointmentStatus =
+  | 'scheduled'
+  | 'confirmed'
+  | 'completed'
+  | 'cancelled'
+  | 'pending_payment'
 
 export interface Appointment {
   id: string
@@ -239,6 +247,8 @@ export interface SubscriptionPlan {
   active: boolean
   created_at: string
   updated_at: string
+  stripe_price_id?: string | null
+  sessions_limit?: number
 }
 
 export type SubscriptionStatus = 'active' | 'cancelled' | 'expired' | 'suspended'
@@ -268,4 +278,58 @@ export interface SubscriptionInvoice {
   status: 'paid' | 'pending' | 'failed'
   paid_at: string | null
   created_at: string
+}
+
+// --- Arquitetura de pagamentos Stripe (Connect + customer_subscriptions) ---
+
+export type CustomerSubscriptionStatus = 'active' | 'cancelled' | 'past_due' | 'unpaid'
+
+export interface CustomerSubscription {
+  id: string
+  customer_id: string
+  tenant_id: string
+  plan_id: string | null
+  stripe_subscription_id: string | null
+  status: CustomerSubscriptionStatus
+  sessions_used: number
+  sessions_limit: number
+  current_period_start: string | null
+  current_period_end: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SubscriptionUsage {
+  id: string
+  customer_subscription_id: string
+  appointment_id: string | null
+  session_date: string
+  created_at: string
+}
+
+export type PlatformEarningSourceType = 'appointment' | 'subscription' | 'product'
+export type PlatformEarningStatus = 'pending' | 'transferred' | 'failed'
+
+export interface PlatformEarning {
+  id: string
+  tenant_id: string | null
+  amount: number
+  fee_percent: number
+  source_type: PlatformEarningSourceType
+  source_id: string | null
+  stripe_charge_id: string | null
+  stripe_transfer_id: string | null
+  status: PlatformEarningStatus
+  created_at: string
+}
+
+export interface StripeConnectAccount {
+  id: string
+  tenant_id: string
+  stripe_account_id: string | null
+  charges_enabled: boolean
+  payouts_enabled: boolean
+  details_submitted: boolean
+  created_at: string
+  updated_at: string
 }

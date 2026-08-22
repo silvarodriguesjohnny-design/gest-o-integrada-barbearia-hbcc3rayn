@@ -104,7 +104,52 @@ Deno.serve(async (req: Request) => {
         .eq('cpf', cleanCpf)
         .maybeSingle()
 
-      return new Response(JSON.stringify({ customer: customer || null }), {
+      // Busca assinatura ativa do cliente para mostrar créditos restantes.
+      let activeSubscription: any = null
+      if (customer) {
+        const { data: sub } = await supabase
+          .from('customer_subscriptions')
+          .select(
+            'id, status, sessions_used, sessions_limit, current_period_end, plan:subscription_plans(name)',
+          )
+          .eq('customer_id', customer.id)
+          .eq('tenant_id', tenant_id)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (sub) {
+          activeSubscription = {
+            id: sub.id,
+            status: sub.status,
+            sessions_used: sub.sessions_used,
+            sessions_limit: sub.sessions_limit,
+            sessions_remaining: Math.max(0, (sub.sessions_limit || 0) - (sub.sessions_used || 0)),
+            current_period_end: sub.current_period_end,
+            plan_name: (sub as any).plan?.name || null,
+          }
+        }
+      }
+
+      return new Response(
+        JSON.stringify({
+          customer: customer || null,
+          active_subscription: activeSubscription,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+
+    // Consome um crédito de assinatura ativa (atomicamente, via RPC FOR UPDATE).
+    if (action === 'consume_subscription_session') {
+      const { tenant_id, customer_id, appointment_id } = body
+      const { data, error } = await supabase.rpc('consume_subscription_session', {
+        p_customer_id: customer_id,
+        p_tenant_id: tenant_id,
+        p_appointment_id: appointment_id || null,
+      })
+      if (error) throw error
+      return new Response(JSON.stringify({ success: !!data, consumed: !!data }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
@@ -133,7 +178,8 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === 'create_booking') {
-      const { tenant_id, service_id, customer_id, barber_name, date, time } = body
+      const { tenant_id, service_id, customer_id, barber_name, date, time, require_prepayment } =
+        body
       // Resolve barber_id from barber_name within the tenant so the new
       // appointment is associated with the barber for the public agenda.
       let barber_id: string | null = null
@@ -149,7 +195,7 @@ Deno.serve(async (req: Request) => {
 
       const { data: service } = await supabase
         .from('services')
-        .select('duration_minutes')
+        .select('duration_minutes, price')
         .eq('id', service_id)
         .single()
 
@@ -160,6 +206,9 @@ Deno.serve(async (req: Request) => {
       const startTime = new Date(`${date}T${time}:00-03:00`)
       const endTime = new Date(startTime.getTime() + duration * 60000)
 
+      // Quando o agendamento exige pagamento antecipado, um slot ocupado por um
+      // agendamento 'pending_payment' também conta como conflito (reserva o
+      // horário durante o checkout do Stripe).
       let conflictQuery = supabase
         .from('appointments')
         .select('id')
@@ -220,6 +269,11 @@ Deno.serve(async (req: Request) => {
         }
       }
 
+      // REGRA #8: se a barbearia exige pagamento antecipado, o agendamento é
+      // salvo com status 'pending_payment' ANTES do redirect ao Stripe, para
+      // reservar o horário. O webhook confirma para 'scheduled' após o pagamento.
+      const initialStatus = require_prepayment ? 'pending_payment' : 'scheduled'
+
       const { data: appointment, error } = await supabase
         .from('appointments')
         .insert({
@@ -230,13 +284,22 @@ Deno.serve(async (req: Request) => {
           barber_id,
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
-          status: 'scheduled',
+          status: initialStatus,
           confirmation_token: crypto.randomUUID(),
         })
         .select()
         .single()
 
       if (error) throw error
+
+      // Se exige prepayment, NÃO dispara notificação de confirmação ainda —
+      // o cliente ainda vai pagar no Stripe. A confirmação só acontece no
+      // webhook checkout.session.completed.
+      if (require_prepayment) {
+        return new Response(JSON.stringify({ appointment }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
 
       // --- Single notification path: invoke send-appointment-notification edge function ---
       // The inline WhatsApp send was removed to eliminate duplicate notifications.

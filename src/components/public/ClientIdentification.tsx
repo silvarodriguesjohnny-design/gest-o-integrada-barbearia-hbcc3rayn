@@ -9,15 +9,17 @@ import {
   identifyCustomer,
   createPublicCustomer,
   type PublicCustomer,
+  type PublicActiveSubscription,
 } from '@/services/public-booking'
 import { formatCpf, isValidCpf } from '@/lib/masks'
 
 interface Props {
   tenantId: string
   onIdentified: (customer: PublicCustomer) => void
+  onSubscriptionFound?: (subscription: PublicActiveSubscription | null) => void
 }
 
-export function ClientIdentification({ tenantId, onIdentified }: Props) {
+export function ClientIdentification({ tenantId, onIdentified, onSubscriptionFound }: Props) {
   const [mode, setMode] = useState<'choose' | 'existing' | 'new'>('choose')
   const [cpf, setCpf] = useState('')
   const [name, setName] = useState('')
@@ -49,8 +51,12 @@ export function ClientIdentification({ tenantId, onIdentified }: Props) {
     setError('')
     const { data } = await identifyCustomer(tenantId, cleanCpf)
     setLoading(false)
-    if (data?.customer) onIdentified(data.customer)
-    else setError('CPF não encontrado. Tente "Primeira vez".')
+    if (data?.customer) {
+      onIdentified(data.customer)
+      onSubscriptionFound?.(data.active_subscription ?? null)
+    } else {
+      setError('CPF não encontrado. Tente "Primeira vez".')
+    }
   }
 
   const handleNew = async () => {
