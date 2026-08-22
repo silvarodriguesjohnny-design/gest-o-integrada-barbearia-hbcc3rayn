@@ -37,6 +37,7 @@ export interface Tenant {
   horario_funcionamento?: string | null
   numero_cadeiras?: number | null
   quantidade_profissionais?: number | null
+  prepayment_enabled?: boolean
 }
 
 export interface Customer {

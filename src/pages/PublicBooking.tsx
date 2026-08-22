@@ -103,6 +103,7 @@ export default function PublicBooking() {
   // --- Pagamento antecipado (antes da confirmação) ---
   const [prepayChoice, setPrepayChoice] = useState<'now' | 'later' | null>(null)
   const [stripeEnabled, setStripeEnabled] = useState(false)
+  const [prepaymentEnabled, setPrepaymentEnabled] = useState(false)
   const [prepaidPlan, setPrepaidPlan] = useState<SubscriptionPlan | null>(null)
 
   const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -131,6 +132,7 @@ export default function PublicBooking() {
           setTenant(data.tenant)
           setServices(data.services)
           setStripeEnabled(!!data.tenant.stripe_enabled)
+          setPrepaymentEnabled(!!data.tenant.prepayment_enabled)
           setResolvedTenantId(data.tenant.id)
           setLoading(false)
         }
@@ -152,6 +154,7 @@ export default function PublicBooking() {
           setTenant(data.tenant)
           setServices(data.services)
           setStripeEnabled(!!data.tenant.stripe_enabled)
+          setPrepaymentEnabled(!!data.tenant.prepayment_enabled)
         }
         setLoading(false)
       })
@@ -907,8 +910,9 @@ export default function PublicBooking() {
                   </div>
 
                   {/* Opção de pagamento antecipado com desconto (apenas se Stripe configurado
-                      e houver plano pré-pago disponível) */}
-                  {stripeEnabled && prepaidPlan ? (
+                      pelo admin, o barbeiro ativou o toggle de prepayment e houver plano
+                      pré-pago disponível) */}
+                  {stripeEnabled && prepaymentEnabled && prepaidPlan ? (
                     <div className="space-y-3 border-t pt-4">
                       <div className="flex items-center gap-2 text-sm md:text-base">
                         <CreditCard className="h-4 w-4 md:h-5 text-accent" />

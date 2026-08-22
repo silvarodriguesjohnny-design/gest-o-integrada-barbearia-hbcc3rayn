@@ -10,6 +10,7 @@ export interface PublicTenant {
   slug: string
   whatsapp_phone: string | null
   stripe_enabled?: boolean
+  prepayment_enabled?: boolean
 }
 
 export interface PublicService {

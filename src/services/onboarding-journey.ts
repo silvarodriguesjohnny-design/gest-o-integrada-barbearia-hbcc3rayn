@@ -28,7 +28,7 @@ export async function getOnboardingProgress(tenantId: string): Promise<Onboardin
     return buildSteps({ servicesAdjusted: false, hasAppointments: false, hasNonCancelled: false })
   }
 
-  const [msgRes, svcRes, apptRes, plansRes, stripeRes] = await Promise.all([
+  const [msgRes, svcRes, apptRes, plansRes, stripeRes, tenantRes] = await Promise.all([
     db
       .from('messaging_configs')
       .select('channel, is_active, config_json')
@@ -37,6 +37,7 @@ export async function getOnboardingProgress(tenantId: string): Promise<Onboardin
     db.from('appointments').select('id, status').eq('tenant_id', tenantId),
     db.from('subscription_plans').select('id').eq('tenant_id', tenantId).limit(1),
     getStripeConfigStatus(),
+    db.from('tenants').select('prepayment_enabled').eq('id', tenantId).maybeSingle(),
   ])
 
   // Passo 1 — WhatsApp conectado (channel 'whatsapp' ativo e com config real)
@@ -69,8 +70,14 @@ export async function getOnboardingProgress(tenantId: string): Promise<Onboardin
   // Passo 5 — Pelo menos 1 combo (subscription_plan)
   const hasCombo = (plansRes.data || []).length > 0
 
-  // Passo 6 — Stripe configurado
+  // Passo 6 — Pagamento antecipado.
+  // Só fica concluído quando AMBAS as condições forem verdadeiras:
+  //   a) Stripe configurado pelo admin (super admin) — via getStripeConfigStatus()
+  //   b) O barbeiro ativou o toggle de pagamento antecipado (prepayment_enabled)
   const stripeConfigured = !!stripeRes.data?.configured
+  const prepaymentEnabled = !!(tenantRes.data as { prepayment_enabled?: boolean } | null)
+    ?.prepayment_enabled
+  const paymentReady = stripeConfigured && prepaymentEnabled
 
   return buildSteps({
     whatsappConnected,
@@ -78,7 +85,7 @@ export async function getOnboardingProgress(tenantId: string): Promise<Onboardin
     hasAppointments,
     hasNonCancelled,
     hasCombo,
-    stripeConfigured,
+    paymentReady,
   })
 }
 
@@ -88,7 +95,7 @@ function buildSteps(state: {
   hasAppointments?: boolean
   hasNonCancelled?: boolean
   hasCombo?: boolean
-  stripeConfigured?: boolean
+  paymentReady?: boolean
 }): OnboardingStep[] {
   return [
     {
@@ -135,7 +142,7 @@ function buildSteps(state: {
       title: 'Aceitar pagamento',
       benefit:
         'Reduz falta e antecipa caixa. O cliente paga no agendamento e já chega com o horário garantido',
-      completed: !!state.stripeConfigured,
+      completed: !!state.paymentReady,
       action: { label: 'Configurar', type: 'navigate', target: '/dashboard/pagamentos' },
     },
   ]
