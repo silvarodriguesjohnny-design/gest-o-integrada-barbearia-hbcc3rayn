@@ -3,26 +3,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import {
-  CreditCard,
-  Loader2,
-  RefreshCw,
-  ShieldCheck,
-  Lock,
-  Building2,
-  CheckCircle2,
-  AlertTriangle,
-  Plus,
-  Sparkles,
-} from 'lucide-react'
+import { CreditCard, Loader2, RefreshCw, ShieldCheck, Lock, Plus, Sparkles } from 'lucide-react'
 import { useAuth } from '@/hooks/use-auth'
 import { useToast } from '@/hooks/use-toast'
 import { getStripeConfigStatus } from '@/services/stripe-config'
-import {
-  getStripeConnectStatus,
-  startStripeConnectOnboarding,
-  type StripeConnectStatus,
-} from '@/services/stripe-connect'
 import { db } from '@/services/db'
 import type { SubscriptionPlan } from '@/types'
 import { useNavigate } from 'react-router-dom'
@@ -33,11 +17,9 @@ export default function Pagamentos() {
   const navigate = useNavigate()
 
   const [stripeReady, setStripeReady] = useState<boolean | null>(null)
-  const [connectStatus, setConnectStatus] = useState<StripeConnectStatus | null>(null)
   const [plans, setPlans] = useState<SubscriptionPlan[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [connecting, setConnecting] = useState(false)
 
   const tenantId = tenant?.id || ''
   const prepaymentEnabled = !!tenant?.prepayment_enabled
@@ -45,10 +27,7 @@ export default function Pagamentos() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [stripeRes, connectRes] = await Promise.all([
-        getStripeConfigStatus(),
-        getStripeConnectStatus(),
-      ])
+      const stripeRes = await getStripeConfigStatus()
 
       if (stripeRes.error) {
         toast({
@@ -60,12 +39,6 @@ export default function Pagamentos() {
       } else {
         setStripeReady(!!stripeRes.data?.configured)
       }
-
-      if (connectRes.error) {
-        // silencioso: pode não ter conta ainda
-        console.warn('[Pagamentos] connect status error:', connectRes.error)
-      }
-      setConnectStatus(connectRes.data ?? null)
 
       // Planos do tenant
       const { data: plansData, error: plansErr } = await db
@@ -88,9 +61,8 @@ export default function Pagamentos() {
 
   const handleToggle = async (checked: boolean) => {
     if (!tenantId || saving) return
-    // Só habilitado se Connect ativo OU Stripe plataforma configurado.
-    const connectEnabled = !!connectStatus?.account?.charges_enabled || stripeReady === true
-    if (!connectEnabled) return
+    // Só habilitado se o Stripe plataforma foi configurado pelo administrador.
+    if (!stripeReady) return
     setSaving(true)
     const { error } = await db
       .from('tenants')
@@ -115,32 +87,6 @@ export default function Pagamentos() {
     })
   }
 
-  const handleConnect = async () => {
-    if (connecting) return
-    setConnecting(true)
-    try {
-      const { data, error } = await startStripeConnectOnboarding()
-      if (error || !data?.account_link_url) {
-        toast({
-          title: 'Erro ao conectar Stripe',
-          description: error?.message || 'Não foi possível gerar o link de onboarding.',
-          variant: 'destructive',
-        })
-        setConnecting(false)
-        return
-      }
-      // Redireciona para o onboarding do Stripe
-      window.location.href = data.account_link_url
-    } catch (err: any) {
-      toast({
-        title: 'Erro ao conectar Stripe',
-        description: err.message,
-        variant: 'destructive',
-      })
-      setConnecting(false)
-    }
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
@@ -150,13 +96,6 @@ export default function Pagamentos() {
   }
 
   const stripeConfigured = stripeReady === true
-  const hasConnect = !!connectStatus?.has_account
-  const connectActive = !!connectStatus?.account?.charges_enabled
-  const connectNeedsCompletion = hasConnect && !connectStatus?.account?.details_submitted
-  const canReceivePayments = connectActive || stripeConfigured
-  // Últimos 4 dígitos da conta Stripe (o ID começa com "acct_")
-  const stripeAccountId = connectStatus?.account?.stripe_account_id || null
-  const lastDigits = stripeAccountId ? stripeAccountId.slice(-4) : null
 
   return (
     <div className="space-y-6 animate-fade-in-up max-w-3xl">
@@ -175,103 +114,9 @@ export default function Pagamentos() {
       </div>
 
       {/* ============================================================ */}
-      {/* SEÇÃO 1 — Stripe Connect (Onboarding)                        */}
-      {/* ============================================================ */}
-      {!hasConnect ? (
-        <Card className="border-accent/30">
-          <CardContent className="p-6 space-y-4">
-            <div className="flex items-start gap-4">
-              <div className="rounded-lg bg-accent/10 p-3">
-                <Building2 className="h-6 w-6 text-accent" />
-              </div>
-              <div className="flex-1">
-                <h2 className="text-xl font-bold">Receba pagamentos direto na sua conta</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Conecte sua conta Stripe para receber pagamentos de agendamentos e assinaturas
-                  diretamente no seu banco, com repasse automático. A plataforma retém apenas{' '}
-                  <strong>2%</strong> por transação.
-                </p>
-              </div>
-            </div>
-            <Button onClick={handleConnect} disabled={connecting} className="w-full sm:w-auto">
-              {connecting ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Building2 className="h-4 w-4 mr-2" />
-              )}
-              {connecting ? 'Conectando…' : 'Conectar Stripe'}
-            </Button>
-          </CardContent>
-        </Card>
-      ) : connectNeedsCompletion ? (
-        <Card className="border-amber-300 bg-amber-50/50 dark:bg-amber-950/10">
-          <CardContent className="p-6 space-y-4">
-            <div className="flex items-start gap-4">
-              <div className="rounded-lg bg-amber-100 dark:bg-amber-900/30 p-3">
-                <AlertTriangle className="h-6 w-6 text-amber-600 dark:text-amber-400" />
-              </div>
-              <div className="flex-1">
-                <h2 className="text-xl font-bold text-amber-800 dark:text-amber-300">
-                  Complete seu cadastro no Stripe
-                </h2>
-                <p className="text-sm text-amber-700/90 dark:text-amber-300/80 mt-1">
-                  Você já iniciou a conexão, mas ainda precisa concluir o cadastro na Stripe para
-                  receber pagamentos. O processo leva poucos minutos.
-                </p>
-              </div>
-            </div>
-            <Button onClick={handleConnect} disabled={connecting} className="w-full sm:w-auto">
-              {connecting ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Building2 className="h-4 w-4 mr-2" />
-              )}
-              {connecting ? 'Abrindo…' : 'Concluir cadastro'}
-            </Button>
-          </CardContent>
-        </Card>
-      ) : connectActive ? (
-        <Card className="border-green-300 bg-green-50/50 dark:bg-green-950/10">
-          <CardContent className="p-6 space-y-2">
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
-              <h2 className="text-xl font-bold text-green-800 dark:text-green-300">
-                Conta conectada ✅
-              </h2>
-              <Badge variant="secondary" className="ml-auto">
-                {lastDigits ? `…${lastDigits}` : 'Conectada'}
-              </Badge>
-            </div>
-            <p className="text-sm text-green-700/80 dark:text-green-300/70">
-              Você está recebendo pagamentos direto na sua conta Stripe. Repasses são automáticos. A
-              plataforma retém <strong>2%</strong> por transação.
-            </p>
-            <div className="flex gap-2 pt-2">
-              <Button variant="outline" size="sm" onClick={handleConnect} disabled={connecting}>
-                <Building2 className="h-4 w-4 mr-2" /> Acessar conta
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="opacity-70">
-          <CardContent className="p-6">
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="h-6 w-6 text-muted-foreground" />
-              <h2 className="text-lg font-bold">Conta em análise</h2>
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              Sua conta Stripe Connect está em processo de análise. Aguarde a liberação para receber
-              pagamentos.
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* ============================================================ */}
       {/* SEÇÃO 2 — Pagamento Antecipado (toggle)                      */}
       {/* ============================================================ */}
-      <Card className={canReceivePayments ? 'border-accent/30' : 'opacity-70'}>
+      <Card className={!stripeConfigured ? 'opacity-70' : ''}>
         <CardContent className="p-6 space-y-6">
           <div className="flex flex-col gap-2">
             <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -296,7 +141,7 @@ export default function Pagamentos() {
               <Switch
                 className="switch-lg"
                 checked={prepaymentEnabled}
-                disabled={!canReceivePayments || saving}
+                disabled={!stripeConfigured || saving}
                 onCheckedChange={handleToggle}
                 aria-label="Receber pagamento antecipado na agenda"
               />
@@ -314,30 +159,22 @@ export default function Pagamentos() {
 
           <p className="text-sm text-muted-foreground text-center max-w-md mx-auto">
             Ao ativar, seus clientes poderão pagar antecipadamente ao agendar. O pagamento é
-            processado pelo Stripe de forma segura
-            {connectActive ? ' e cai direto na sua conta' : ''}.
+            processado pelo Stripe de forma segura.
           </p>
 
-          {!canReceivePayments ? (
+          {!stripeConfigured ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50/60 dark:bg-amber-950/20 p-4 text-sm flex items-start gap-3">
               <Lock className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
               <div>
                 <p className="font-semibold text-amber-800 dark:text-amber-300">
-                  Pagamento antecipado ainda não disponível.
-                </p>
-                <p className="text-amber-700/80 dark:text-amber-300/70 mt-1">
-                  {hasConnect
-                    ? 'Conclua o cadastro da sua conta Stripe acima para liberar.'
-                    : 'Conecte sua conta Stripe acima para liberar.'}
+                  Pagamento antecipado ainda não disponível. Aguarde a ativação pelo administrador.
                 </p>
               </div>
             </div>
           ) : (
             <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
               <Lock className="h-3.5 w-3.5" />
-              {connectActive
-                ? 'Recebendo direto na sua conta Stripe Connect.'
-                : 'Plataforma de pagamentos ativada pelo administrador.'}
+              Plataforma de pagamentos ativada pelo administrador.
             </div>
           )}
 
