@@ -11,7 +11,9 @@ import {
   CheckCircle2,
   Upload,
   Image as ImageIcon,
+  FileArchive,
 } from 'lucide-react'
+import { downloadPwaZip } from '@/lib/pwa-zip'
 
 interface TenantOption {
   id: string
@@ -158,7 +160,33 @@ export function TotemPwaPage() {
     setMessage({ type: 'ok', text: `PWA gerado! manifest disponível em /agendar/${slug}.` })
   }
 
+  const [downloading, setDownloading] = useState(false)
+
   const installUrl = slug ? `${window.location.origin}/agendar/${slug}?install=true` : ''
+
+  const handleDownloadZip = async () => {
+    if (!tenantId || !appName || !slug) {
+      setMessage({ type: 'err', text: 'Selecione a barbearia e salve a configuração primeiro.' })
+      return
+    }
+    setDownloading(true)
+    setMessage(null)
+    try {
+      await downloadPwaZip({
+        appName,
+        bgColor,
+        themeColor,
+        icon192Url,
+        icon512Url,
+        slug,
+      })
+      setMessage({ type: 'ok', text: 'ZIP gerado: manifest.json, index.html e ícones.' })
+    } catch (err: any) {
+      setMessage({ type: 'err', text: err?.message || 'Erro ao gerar o ZIP.' })
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   const handleShowQr = async () => {
     if (!installUrl) return
@@ -373,6 +401,9 @@ export function TotemPwaPage() {
         </Button>
         <Button variant="outline" onClick={handleShowQr} disabled={!slug}>
           <QrCode className="h-4 w-4" /> Ver QR Code
+        </Button>
+        <Button variant="outline" onClick={handleDownloadZip} loading={downloading} disabled={!tenantId || !appName || !slug}>
+          <FileArchive className="h-4 w-4" /> Baixar App (.zip)
         </Button>
       </div>
 

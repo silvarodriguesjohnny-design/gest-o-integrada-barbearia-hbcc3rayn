@@ -27,10 +27,12 @@ import {
   CheckCircle2,
   Upload,
   Image as ImageIcon,
+  FileArchive,
 } from 'lucide-react'
 import { getAllTenants } from '@/services/super-admin'
 import { saveTotemConfig, getTotemConfig, uploadTotemIcon } from '@/services/totem-pwa'
 import { useToast } from '@/hooks/use-toast'
+import { downloadPwaZip } from '@/lib/pwa-zip'
 import QRCode from 'qrcode'
 
 interface TenantOption {
@@ -45,6 +47,7 @@ export default function AdminTotemPwa() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [generating, setGenerating] = useState(false)
+  const [downloading, setDownloading] = useState(false)
 
   const [tenantId, setTenantId] = useState('')
   const [appName, setAppName] = useState('')
@@ -185,6 +188,40 @@ export default function AdminTotemPwa() {
   }
 
   const installUrl = slug ? `${window.location.origin}/agendar/${slug}?install=true` : ''
+
+  const handleDownloadZip = async () => {
+    if (!tenantId || !appName || !slug) {
+      toast({
+        title: 'Dados incompletos',
+        description: 'Selecione a barbearia e informe o nome do app antes de baixar.',
+        variant: 'destructive',
+      })
+      return
+    }
+    setDownloading(true)
+    try {
+      await downloadPwaZip({
+        appName,
+        bgColor,
+        themeColor,
+        icon192Url,
+        icon512Url,
+        slug,
+      })
+      toast({
+        title: 'ZIP gerado!',
+        description: 'manifest.json, index.html e ícones (192/512).',
+      })
+    } catch (err: any) {
+      toast({
+        title: 'Erro ao gerar ZIP',
+        description: err?.message || 'Tente novamente.',
+        variant: 'destructive',
+      })
+    } finally {
+      setDownloading(false)
+    }
+  }
 
   const handleShowQr = async () => {
     if (!installUrl) return

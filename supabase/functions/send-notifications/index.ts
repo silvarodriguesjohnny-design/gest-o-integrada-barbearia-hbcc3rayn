@@ -359,49 +359,47 @@ Deno.serve(async (req: Request) => {
     }
 
     // 3. No-show detection
-    // Detects BOTH 'scheduled' and 'confirmed' appointments whose end_time is
-    // in the past and that have not yet received a no-show (absence) notice.
-    // A confirmed appointment that the client did not show up for is treated
-    // as a no-show: an absence message is sent, status -> 'cancelled', and
-    // reminder_sent is set to true. Because the loyalty trigger only fires on
-    // status -> 'completed', a no-show (cancelled) never awards a stamp.
-    console.log('[send-notifications] === STEP 3: No-show detection ===')
-    const { data: noShowAppts, error: noShowError } = await supabase
-      .from('appointments')
-      .select('*, customer:customers(*), service:services(*), tenant:tenants(name)')
-      .in('status', ['scheduled', 'confirmed'])
-      .lt('end_time', now.toISOString())
-      .neq('reminder_sent', true)
-
-    if (noShowError) {
-      console.error('[send-notifications] STEP 3 QUERY ERROR:', noShowError.message)
-    }
-    console.log(
-      '[send-notifications] STEP 3: Found',
-      noShowAppts?.length || 0,
-      'no-show appointments',
-    )
-
-    for (const appt of noShowAppts ?? []) {
-      const apptDate = new Date(appt.start_time).toLocaleString('pt-BR')
-      const msg = `⚠️ *Aviso de Ausência*\n\nOlá ${appt.customer?.name}!\nNotamos que você não compareceu ao agendamento de ${appt.service?.name} em ${apptDate}.\nEntre em contato para remarcar!\n\n${appt.tenant?.name}`
-      await sendApptNotif(appt, msg, 'whatsapp_absence', 'absence_alert')
-      console.log(
-        '[send-notifications] STEP 3: Marking appointment',
-        appt.id,
-        'as cancelled + reminder_sent',
-      )
-      const { error: updateError } = await supabase
-        .from('appointments')
-        .update({ status: 'cancelled', reminder_sent: true })
-        .eq('id', appt.id)
-      if (updateError) {
-        console.error(
-          '[send-notifications] STEP 3: Error updating appointment status:',
-          updateError.message,
-        )
-      }
-    }
+    // DISABLED (v0.0.86): the no-show block was auto-cancelling past-due
+    // appointments and sending WhatsApp absence messages. Commented out per
+    // request. Step kept here as a no-op placeholder so the numbering stays
+    // stable for the steps that follow.
+    console.log('[send-notifications] === STEP 3: No-show detection (DISABLED) ===')
+    // const { data: noShowAppts, error: noShowError } = await supabase
+    //   .from('appointments')
+    //   .select('*, customer:customers(*), service:services(*), tenant:tenants(name)')
+    //   .in('status', ['scheduled', 'confirmed'])
+    //   .lt('end_time', now.toISOString())
+    //   .neq('reminder_sent', true)
+    //
+    // if (noShowError) {
+    //   console.error('[send-notifications] STEP 3 QUERY ERROR:', noShowError.message)
+    // }
+    // console.log(
+    //   '[send-notifications] STEP 3: Found',
+    //   noShowAppts?.length || 0,
+    //   'no-show appointments',
+    // )
+    //
+    // for (const appt of noShowAppts ?? []) {
+    //   const apptDate = new Date(appt.start_time).toLocaleString('pt-BR')
+    //   const msg = `⚠️ *Aviso de Ausência*\n\nOlá ${appt.customer?.name}!\nNotamos que você não compareceu ao agendamento de ${appt.service?.name} em ${apptDate}.\nEntre em contato para remarcar!\n\n${appt.tenant?.name}`
+    //   await sendApptNotif(appt, msg, 'whatsapp_absence', 'absence_alert')
+    //   console.log(
+    //     '[send-notifications] STEP 3: Marking appointment',
+    //     appt.id,
+    //     'as cancelled + reminder_sent',
+    //   )
+    //   const { error: updateError } = await supabase
+    //     .from('appointments')
+    //     .update({ status: 'cancelled', reminder_sent: true })
+    //     .eq('id', appt.id)
+    //   if (updateError) {
+    //     console.error(
+    //       '[send-notifications] STEP 3: Error updating appointment status:',
+    //       updateError.message,
+    //     )
+    //   }
+    // }
 
     // 4. Birthday notifications
     console.log('[send-notifications] === STEP 4: Birthday notifications ===')
